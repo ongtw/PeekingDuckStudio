@@ -1,0 +1,16 @@
+# python stuff
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C stuff
+*.so
+
+# macos stuff
+.DS_Store
+
+# other stuff
+.swp
+
+# my stuff
+z_files/
