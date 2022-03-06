@@ -1,0 +1,73 @@
+#:kivy 2.0.0
+
+#
+# The root widget
+#
+#:import hex kivy.utils.get_color_from_hex
+BoxLayout:
+    canvas.before:
+        Color:
+            rgba: hex("#C0C0C0")    # silver
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    FloatLayout:
+        id: id_floatlayout
+
+        #
+        # top display
+        #
+        FloatLayout:
+            pos_hint: {'x':0.005, 'y':0.905}
+            size_hint: 0.99, 0.09
+            canvas.before:
+                Color:
+                    rgba: hex("#0000cd")    # medium blue
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(8),]
+
+        #
+        # middle screen
+        #
+        FloatLayout:
+            id: id_mainscreen
+            pos_hint: {'x':0.005, 'y':0.10}
+            size_hint: 0.99, 0.80
+            background_color: 0,0,0,0
+            canvas.before:
+                Color:
+                    rgba: hex("#000000")    # black
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(10),]
+
+        #
+        # bottom controls
+        #
+        FloatLayout:
+            pos_hint: {'x':0.005, 'y':0.005}
+            size_hint: 0.99, 0.09
+            background_color: 0,0,0,0
+            canvas.before:
+                Color:
+                    rgba: hex("#ff0000")    # red
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(8),]
+            # bottom: left half
+            StackLayout:
+                orientation: "lr-tb"
+                pos_hint: {'x':0.010, 'y':0.10}
+                size_hint: 0.48, 0.80
+                canvas.before:
+                    Color:
+                        rgba: hex("#C0C0C0")    # silver
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(8),]
