@@ -1,10 +1,49 @@
 #:kivy 2.0.0
+#:import hex kivy.utils.get_color_from_hex
 
+###############
+# GUI templates
+###############
+<PkdButton@Button>:
+    font_size: "12sp"
+    color: 0,0,0,1  # black button text
+    background_color: 0,0,0,0
+    canvas.before:
+        Color:
+            rgba: hex("#C0C0C0") if self.state == "normal" else hex("#808080")
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(8),]
+
+<__MenuSep__@Label>:
+    size_hint: 0.04, 1.00
+
+<FileLoadDialog>:
+    BoxLayout:
+        id: id_box
+        orientation: "vertical"
+        size: root.size
+        pos: root.pos
+        file_chooser: id_file_chooser.__self__
+        FileChooserListView:
+            id: id_file_chooser
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+            Button:
+                text: "Load"
+                on_release: root.load(id_file_chooser.path, id_file_chooser.selection)
+
+###################
 #
 # The root widget
 #
-#:import hex kivy.utils.get_color_from_hex
-BoxLayout:
+###################
+<PeekingDuckGUI>:
     canvas.before:
         Color:
             rgba: hex("#C0C0C0")    # silver
@@ -15,12 +54,12 @@ BoxLayout:
     FloatLayout:
         id: id_floatlayout
 
-        #
-        # top display
-        #
+        ####################
+        # top menu
+        ####################
         FloatLayout:
-            pos_hint: {'x':0.005, 'y':0.905}
-            size_hint: 0.99, 0.09
+            pos_hint: {'x':0.005, 'y':0.945}
+            size_hint: 0.99, 0.05
             canvas.before:
                 Color:
                     rgba: hex("#0000cd")    # medium blue
@@ -28,14 +67,49 @@ BoxLayout:
                     pos: self.pos
                     size: self.size
                     radius: [dp(8),]
+            # bottom: left half
+            BoxLayout:
+                orientation: "horizontal"
+                pos_hint: {'x':0.010, 'y':0.10}
+                size_hint: 0.48, 0.80
+                canvas.before:
+                    Color:
+                        rgba: hex("#0000cd")    # medium blue
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(8),]
 
-        #
+                ###############
+                # Menu buttons
+                ###############
+                PkdButton:
+                    id: id_btn_about
+                    text: "About"
+                    on_release: root.btn_about()
+                __MenuSep__
+                PkdButton:
+                    id: id_btn_load
+                    text: "Load File"
+                    on_release: root.btn_load_file()
+                __MenuSep__
+                PkdButton:
+                    id: id_btn_load
+                    text: "Save File"
+                    on_release: root.btn_save_file()
+                __MenuSep__
+                PkdButton:
+                    id: id_btn_exit
+                    text: "Exit"
+                    on_release: app.stop()
+
+        ####################
         # middle screen
-        #
+        ####################
         FloatLayout:
             id: id_mainscreen
             pos_hint: {'x':0.005, 'y':0.10}
-            size_hint: 0.99, 0.80
+            size_hint: 0.80, 0.84
             background_color: 0,0,0,0
             canvas.before:
                 Color:
@@ -44,10 +118,22 @@ BoxLayout:
                     pos: self.pos
                     size: self.size
                     radius: [dp(10),]
+        FloatLayout:
+            id: id_right_panel
+            pos_hint: {'x':0.815, 'y':0.10}
+            size_hint: 0.18, 0.84
+            background_color: 0,0,0,0
+            canvas.before:
+                Color:
+                    rgba: hex("#000077")    # darker blue
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(10),]
 
-        #
+        ####################
         # bottom controls
-        #
+        ####################
         FloatLayout:
             pos_hint: {'x':0.005, 'y':0.005}
             size_hint: 0.99, 0.09
@@ -60,14 +146,29 @@ BoxLayout:
                     size: self.size
                     radius: [dp(8),]
             # bottom: left half
-            StackLayout:
-                orientation: "lr-tb"
+            BoxLayout:
+                orientation: "horizontal"
                 pos_hint: {'x':0.010, 'y':0.10}
                 size_hint: 0.48, 0.80
                 canvas.before:
                     Color:
-                        rgba: hex("#C0C0C0")    # silver
+                        rgba: hex("#ff0000")    # red light
                     RoundedRectangle:
                         pos: self.pos
                         size: self.size
                         radius: [dp(8),]
+
+                #################
+                # Control buttons
+                #################
+                PkdButton:
+                    id: id_btn_01
+                    text: "Btn_01"
+                __MenuSep__
+                PkdButton:
+                    id: id_btn_02
+                    text: "Btn_02"
+                __MenuSep__
+                PkdButton:
+                    id: id_btn_03
+                    text: "Btn_03"
