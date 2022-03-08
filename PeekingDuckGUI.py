@@ -7,6 +7,14 @@
 ROOT_PATH = "/Users/dotw"
 WIN_WIDTH = 1024
 WIN_HEIGHT = 768
+COPYRIGHT_MSG = """
+PeekingDuckGUI
+By DOTW
+(C) 2022
+
+A GUI application to manage 
+PeekingDuck's pipeline nodes
+"""
 
 # Imports
 from typing import Dict, List
@@ -33,7 +41,10 @@ from kivy.uix.popup import Popup
 
 def show_alert(msg: str, title: str):
     popup = Popup(
-        title=title, content=Label(text=msg), size_hint=(None, None), size=(400, 400)
+        title=title,
+        content=Label(text=msg, halign="center"),
+        size_hint=(None, None),
+        size=(400, 300),
     )
     popup.open()
 
@@ -61,7 +72,7 @@ class PeekingDuckGUI(BoxLayout):
     # GUI callbacks
     #####################
     def btn_about(self):
-        show_alert("PeekingDuckGUI", "About PeekingDuck")
+        show_alert(title="About PeekingDuck", msg=COPYRIGHT_MSG)
 
     def btn_load_file(self):
         file_dialog = FileLoadDialog(load=self.load_file, cancel=self.cancel_load)
@@ -95,9 +106,6 @@ class PeekingDuckGUIApp(App):
         self.pkd = PeekingDuckGUI()
         self.pkd.app = self
         return self.pkd
-
-    def btn(self):
-        show_alert("PeekingDuckApp", "AppDialog")
 
 
 if __name__ == "__main__":
