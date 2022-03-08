@@ -3,26 +3,27 @@
 # by DOTW 2022-03-06
 #
 
-from typing import Dict, List
-
+# Globals
 ROOT_PATH = "/Users/dotw"
+WIN_WIDTH = 1024
+WIN_HEIGHT = 768
 
+# Imports
+from typing import Dict, List
+import yaml
 
-# change window size from 800x600 to 1024x768 (must be before other kivy modules)
-from tkinter.filedialog import LoadFileDialog
 from kivy.config import Config
 
-Config.set("graphics", "width", "1024")
-Config.set("graphics", "height", "768")
-Config.set("graphics", "minimum_width", "1024")
-Config.set("graphics", "minimum_height", "768")
+# change window size from 800x600 to 1024x768 (must be before other kivy modules)
+Config.set("graphics", "width", WIN_WIDTH)
+Config.set("graphics", "height", WIN_HEIGHT)
+Config.set("graphics", "minimum_width", WIN_WIDTH)
+Config.set("graphics", "minimum_height", WIN_HEIGHT)
 Config.set("graphics", "resizable", False)
 
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
-from kivy.factory import Factory
-from kivy.lang import Builder
 from kivy.properties import ObjectProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
@@ -38,6 +39,7 @@ def show_alert(msg: str, title: str):
 
 
 class FileLoadDialog(FloatLayout):
+    # map to load_file() and cancel_file() methods
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
 
@@ -50,13 +52,19 @@ class FileLoadDialog(FloatLayout):
 
 class PeekingDuckGUI(BoxLayout):
     #####################
+    # Object vars
+    #####################
+    pipeline_file_path: str = None
+    pipeline: Dict = None
+
+    #####################
     # GUI callbacks
     #####################
     def btn_about(self):
         show_alert("PeekingDuckGUI", "About PeekingDuck")
 
     def btn_load_file(self):
-        file_dialog = FileLoadDialog(load=self.do_load, cancel=self.do_cancel)
+        file_dialog = FileLoadDialog(load=self.load_file, cancel=self.cancel_load)
         file_dialog.setup(path="/Users/dotw/src/ongtw", filters=["*.yml"])
         self._popup = Popup(
             title="Load File", content=file_dialog, size_hint=(0.9, 0.9)
@@ -66,12 +74,20 @@ class PeekingDuckGUI(BoxLayout):
     def btn_save_file(self):
         pass
 
-    def do_cancel(self):
+    def cancel_load(self):
         self._popup.dismiss()
 
-    def do_load(self, path: str, filepath: str):
-        print(f"path={path}, filepath={filepath}")
+    #####################
+    # File operations
+    #####################
+    def load_file(self, path: str, file_paths: List[str]):
+        print(f"path={path}, file_paths={file_paths}")
         self._popup.dismiss()
+        self.pipeline_file_path = file_paths[0]  # only want first file
+        with open(self.pipeline_file_path) as file:
+            self.pipeline = yaml.safe_load(file)
+        print(f"self.pipeline: {self.pipeline_file_path}")
+        print(self.pipeline)
 
 
 class PeekingDuckGUIApp(App):
