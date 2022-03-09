@@ -44,6 +44,10 @@
 #
 ###################
 <PeekingDuckGUI>:
+    # accessible widgets
+    pipeline_scrollview: id_pipeline_scrollview
+    main_screen: id_main_screen
+
     canvas.before:
         Color:
             rgba: hex("#C0C0C0")    # silver
@@ -106,26 +110,29 @@
         ####################
         # middle screen
         ####################
-        FloatLayout:
-            id: id_mainscreen
-            pos_hint: {'x':0.005, 'y':0.10}
-            size_hint: 0.80, 0.84
-            background_color: 0,0,0,0
-            canvas.before:
-                Color:
-                    rgba: hex("#000000")    # black
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [dp(10),]
-        FloatLayout:
-            id: id_right_panel
-            pos_hint: {'x':0.815, 'y':0.10}
-            size_hint: 0.18, 0.84
+        ScrollView:
+            id: id_pipeline_scrollview
+            pos_hint: {'x':0.005, 'y':0.07}
+            size_hint: 0.30, 0.87
             background_color: 0,0,0,0
             canvas.before:
                 Color:
                     rgba: hex("#000077")    # darker blue
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(10),]
+            do_scroll_x: False
+            do_scroll_y: True
+            scroll_hint: 1, None
+        FloatLayout:
+            id: id_main_screen
+            pos_hint: {'x':0.315, 'y':0.07}
+            size_hint: 0.68, 0.87
+            background_color: 0,0,0,0
+            canvas.before:
+                Color:
+                    rgba: hex("#000000")    # black
                 RoundedRectangle:
                     pos: self.pos
                     size: self.size
@@ -136,7 +143,7 @@
         ####################
         FloatLayout:
             pos_hint: {'x':0.005, 'y':0.005}
-            size_hint: 0.99, 0.09
+            size_hint: 0.99, 0.06
             background_color: 0,0,0,0
             canvas.before:
                 Color:
@@ -162,13 +169,18 @@
                 # Control buttons
                 #################
                 PkdButton:
-                    id: id_btn_01
-                    text: "Btn_01"
+                    id: id_btn_back
+                    text: "<<"
                 __MenuSep__
                 PkdButton:
-                    id: id_btn_02
-                    text: "Btn_02"
+                    id: id_btn_play
+                    text: ">"
+                    font_size: "16sp"
                 __MenuSep__
                 PkdButton:
-                    id: id_btn_03
-                    text: "Btn_03"
+                    id: id_btn_forward
+                    text: ">>"
+                __MenuSep__
+                PkdButton:
+                    id: id_btn_pause
+                    text: "||"
