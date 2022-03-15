@@ -20,6 +20,7 @@ NODE_RGBA_COLOR = {
 }
 BLACK = (0, 0, 0, 1)
 WHITE = (1, 1, 1, 1)
+NODE_SELECT_COLOR = (1, 0, 0, 1)
 
 # Imports
 from re import A
@@ -64,6 +65,7 @@ class FileLoadDialog(FloatLayout):
 
 class Node(GridLayout):
     bkgd_color = ListProperty([0, 0, 1, 1])
+    border_color = ListProperty([0, 0, 0, 1])
     node_number = ObjectProperty("0")
     node_text = ObjectProperty("")
 
@@ -97,6 +99,7 @@ class pkdguiApp(App):
         Window.left = 100
         # Window.top = 100
         self.play = "stop"
+        self.selected_nodes = set()
         return sm
 
     # App GUI Widget Access
@@ -134,8 +137,15 @@ class pkdguiApp(App):
 
     def btn_node_press(self, *args):
         btn = args[0]
-        print(f"*args={args}")
-        print(f"btn: {btn.text}")
+        print(f"*args={args}, btn: {btn.text}")
+        # clear currently selected node
+        for node in self.selected_nodes:
+            node.border_color = BLACK
+        self.selected_nodes.clear()
+        # set new selected node
+        node = btn.parent
+        node.border_color = NODE_SELECT_COLOR
+        self.selected_nodes.add(node)
         node_title = btn.text
         node_type = get_node_type(node_title)
         node_color = NODE_RGBA_COLOR[node_type]
