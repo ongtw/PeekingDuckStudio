@@ -20,7 +20,11 @@ NODE_RGBA_COLOR = {
 }
 BLACK = (0, 0, 0, 1)
 WHITE = (1, 1, 1, 1)
-NODE_SELECT_COLOR = (1, 0, 0, 1)
+NAVY = (0, 0, 0.5, 1)
+NODE_COLOR_SELECTED = (0, 0, 1, 0.5)
+NODE_COLOR_CLEAR = (0, 0, 1, 0)
+CONFIG_COLOR_SELECTED = (0.5, 0.5, 0.5, 0.5)
+CONFIG_COLOR_CLEAR = (0.5, 0.5, 0.5, 0)
 
 # Imports
 from re import A
@@ -65,15 +69,23 @@ class FileLoadDialog(FloatLayout):
 
 class Node(GridLayout):
     bkgd_color = ListProperty([0, 0, 1, 1])
-    border_color = ListProperty([0, 0, 0, 1])
+    select_color = ListProperty([0, 0, 0, 0])
     node_number = ObjectProperty("0")
     node_text = ObjectProperty("")
 
 
 class Config(GridLayout):
     bkgd_color = ListProperty([0, 0, 1, 1])
+    select_color = ListProperty([0, 0, 0, 0])
     config_key = ObjectProperty("key")
     config_value = ObjectProperty("value")
+
+
+class Output(GridLayout):
+    def on_touch_down(self, touch):
+        # if self.collide_point(*touch.pos):
+        #     print("Output: touch inside me")
+        self.touch_down_callback(touch)
 
 
 class ScreenOne(Screen):
@@ -98,21 +110,37 @@ class pkdguiApp(App):
         self.sm = sm
         Window.left = 100
         # Window.top = 100
+
         self.play = "stop"
         self.selected_nodes = set()
+        self.selected_configs = set()
+        self.setup_output()
+        self.setup_key_widgets()
         return sm
 
     # App GUI Widget Access
-    def set_pipeline_header(self, text: str):
+    def setup_output(self):
+        screen = self.screen_one
+        pkd_view = screen.ids["pkd_view"]
+        pkd_output = pkd_view.ids["pkd_output"]
+        self.pkd_output = pkd_output
+        pkd_output.touch_down_callback = self.on_touch_down
+
+    def setup_key_widgets(self):
         screen = self.screen_one
         pipeline_view = screen.ids["pipeline_view"]
-        header = pipeline_view.ids["pipeline_header"]
-        header.header_text = text
+        pipeline_header = pipeline_view.ids["pipeline_header"]
+        self.pipeline_header = pipeline_header
+        pipeline_config_header = pipeline_view.ids["pipeline_config_header"]
+        self.pipeline_config_header = pipeline_config_header
+        pipeline_config = pipeline_view.ids["pipeline_config"]
+        self.config_layout = pipeline_config.ids["config_layout"]
+
+    def set_pipeline_header(self, text: str):
+        self.pipeline_header.header_text = text
 
     def set_node_config_header(self, text: str, color=None, font_color=None):
-        screen = self.screen_one
-        pipeline_view = screen.ids["pipeline_view"]
-        header = pipeline_view.ids["pipeline_config_header"]
+        header = self.pipeline_config_header
         header.header_text = text
         if color:
             header.header_color = color
@@ -120,32 +148,61 @@ class pkdguiApp(App):
             header.font_color = font_color
 
     def set_node_config(self, node_config):
-        print(node_config)
-        screen = self.screen_one
-        pipeline_view = screen.ids["pipeline_view"]
-        pipeline_config = pipeline_view.ids["pipeline_config"]
-        config_layout = pipeline_config.ids["config_layout"]
+        config_layout = self.config_layout
         config_layout.clear_widgets()
         for config in node_config:
             for k, v in config.items():
                 config = Config(config_key=str(k), config_value=str(v))
                 config_layout.add_widget(config)
 
-    # App GUI Event Callbacks
-    def btn_dummy(self, *args):
-        print("btn_dummy: nothing at all")
+    def reset_node_config(self):
+        self.config_layout.clear_widgets()
+        self.set_node_config_header("Node Config", color=NAVY, font_color=WHITE)
 
-    def btn_node_press(self, *args):
-        btn = args[0]
-        print(f"*args={args}, btn: {btn.text}")
-        # clear currently selected node
+    def clear_selected_configs(self):
+        for config in self.selected_configs:
+            config.select_color = CONFIG_COLOR_CLEAR
+        self.selected_configs.clear()
+
+    def clear_selected_nodes(self):
         for node in self.selected_nodes:
-            node.border_color = BLACK
+            node.select_color = NODE_COLOR_CLEAR
         self.selected_nodes.clear()
+        self.reset_node_config()
+
+    # App GUI Event Callbacks
+    # Buttons
+    def btn_dummy(self, btn, *args):
+        parent = btn.parent
+        if parent.tag:
+            print(f"btn_dummy: {parent.tag}")
+        else:
+            print("btn_dummy: nothing at all")
+
+    def btn_config_press(self, btn, *args):
+        """This method is called when a node config is clicked
+
+        Args:
+            btn (_type_): the config that is clicked on
+        """
+        self.clear_selected_configs()
+        # set new selected config
+        config = btn.parent
+        config.select_color = CONFIG_COLOR_SELECTED
+        self.selected_configs.add(config)
+
+    def btn_node_press(self, btn, *args):
+        """This method is called when a pipeline node is clicked
+
+        Args:
+            btn (_type_): the node that is clicked on
+        """
+        self.clear_selected_nodes()
         # set new selected node
         node = btn.parent
-        node.border_color = NODE_SELECT_COLOR
+        node.select_color = NODE_COLOR_SELECTED
         self.selected_nodes.add(node)
+        # update node config view
         node_title = btn.text
         node_type = get_node_type(node_title)
         node_color = NODE_RGBA_COLOR[node_type]
@@ -156,7 +213,7 @@ class pkdguiApp(App):
         node_config = self.pipeline_nodes[node_title]
         self.set_node_config(node_config)
 
-    def btn_load_file(self):
+    def btn_load_file(self, btn, *args):
         file_dialog = FileLoadDialog(load=self.load_file, cancel=self.cancel_load)
         file_dialog.setup(path=CURR_PATH, filters=FILE_FILTERS)
         self._file_dialog = Popup(
@@ -164,10 +221,10 @@ class pkdguiApp(App):
         )
         self._file_dialog.open()
 
-    def btn_save_file(self):
+    def btn_save_file(self, btn, *args):
         print("btn_save_file: not implemented yet")
 
-    def btn_quit(self):
+    def btn_quit(self, btn, *args):
         # todo: ask user to confirm quit / save changes
         self.stop()
 
@@ -177,6 +234,21 @@ class pkdguiApp(App):
     # Playback controls
     def btn_play_stop(self):
         print("btn_play_stop")
+
+    # Touch events
+    def on_touch_down(self, touch):
+        """This method is passed as a callback to widgets to get them to reroute
+        their touch_down event back here.
+
+        Args:
+            touch (_type_): the touch event
+        """
+        # print(f"app touch: {touch.x}, {touch.y}")
+        if self.pkd_output.collide_point(*touch.pos):
+            self.clear_selected_configs()
+            self.clear_selected_nodes()
+        else:
+            pass
 
     #####################
     # File operations

@@ -83,6 +83,7 @@
     text: ""
     text_size: sp(15)
     callback: app.btn_dummy
+    tag: ""
     Separator:
         line_color: BLACK
         width: dp(2)
@@ -96,7 +97,7 @@
         font_size: root.text_size
         padding: (dp(10), dp(10))
         text: root.text
-        on_release: root.callback()
+        on_release: root.callback(self)
         canvas.before:
             Color:
                 rgba: ROYAL_BLUE if self.state == "normal" else DODGER_BLUE
@@ -127,17 +128,12 @@
     padding: [dp(10), dp(10), dp(10), dp(10)]
     size_hint: (1, None)
     size: (0, dp(80))
-    canvas:
+    canvas.after:
         Color:
-            rgba: root.border_color
+            rgba: root.select_color
         Rectangle:
             pos: self.pos
             size: self.size
-        Color:
-            rgba: 0, 0, 0, 1
-        Rectangle:
-            pos: self.x+dp(2), self.y+dp(2)
-            size: self.width-dp(4), self.height-dp(4)
 
     BoxLayout:
         size_hint_x: None
@@ -161,6 +157,12 @@
     padding: [dp(10), dp(10), dp(10), dp(10)]
     size_hint: (1, None)
     size: (0, dp(80))
+    canvas.after:
+        Color:
+            rgba: root.select_color
+        Rectangle:
+            pos: self.pos
+            size: self.size
     BoxLayout:
         size_hint_x: None
         width: dp(80)
@@ -174,6 +176,7 @@
         valign: "middle"
         text_size: self.size
         text: root.config_value
+        on_press: app.btn_config_press(self)
 
 
 #
@@ -200,22 +203,28 @@
     padding: 10
     spacing: 10
     RoundedButton:
+        tag: "node_add"
         text: "+"
         text_size: sp(20)
     RoundedButton:
+        tag: "node_delete"
         text: EN_DASH
     RoundedButton:
+        tag: "node_up"
         text: TRIANGLE_UP
     RoundedButton:
+        tag: "node_down"
         text: TRIANGLE_DOWN
 
 <ConfigControls@BoxLayout>:
     padding: 10
     spacing: 10
     RoundedButton:
+        tag: "config_add"
         text: "+"
         text_size: sp(20)
     RoundedButton:
+        tag: "config_delete"
         text: EN_DASH
 
 <PipelineControls@BoxLayout>:
@@ -234,7 +243,7 @@
 #
 # PeekingDuck Output Widgets
 #
-<PeekingDuckOutput@GridLayout>:
+<Output>:
     cols: 1
     rows: 1
     Label:
@@ -244,15 +253,20 @@
     padding: 6
     spacing: 10
     RoundedButton:
+        tag: "play/stop"
         text: TRIANGLE_RIGHT
         text_size: sp(20)
     RoundedButton:
+        tag: "pause"
         text: "||"
     RoundedButton:
+        tag: "rewind"
         text: LINE_VERTICAL + TRIANGLE_LEFT
     RoundedButton:
+        tag: "backward"
         text: TRIANGLE_LEFT + TRIANGLE_LEFT
     RoundedButton:
+        tag: "forward"
         text: TRIANGLE_RIGHT + TRIANGLE_RIGHT
 
 
@@ -305,7 +319,7 @@
         id: pkd_header
         header_color: GUI_COLOR
         header_text: "PeekingDuck"
-    PeekingDuckOutput:
+    Output:
         id: pkd_output
     PeekingDuckControls:
         id: pkd_controls
