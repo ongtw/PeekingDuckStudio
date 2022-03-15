@@ -1,0 +1,43 @@
+PeekingDuck GUI Technotes
+=========================
+
+Features:
+1. load, edit, save pipeline
+2. run pipeline
+    * start, stop, pause, forward, backward
+3. pipeline
+    * visualisation
+        - select, move nodes
+    * configuration
+        - config options panel
+    * error checking
+        - input, output consistency
+
+
+GUI:
+    +-------------------+--------------------------------------+
+    |      header       |                header                |
+    +-------------------+--------------------------------------+
+    |                   |                                      |
+    |                   |                                      |
+    |                   |                                      |
+    |     pipeline      |                                      |
+    |       nodes       |                                      |
+    |                   |                                      |
+    |                   |                                      |
+    |-------------------|             PeekingDuck              |
+    |    node ctrls     |                Output                |
+    +-------------------+                                      |
+    |      header       |                                      |
+    |-------------------|                                      |
+    |                   |                                      |
+    |       node        |                                      |
+    |   configuration   |                                      |
+    |                   |                                      |
+    |-------------------|                                      |
+    |    config ctrls   |                                      |
+    +-------------------+--------------------------------------+
+    | pipeline controls |          playback controls           |
+    +-------------------+--------------------------------------+
+
+

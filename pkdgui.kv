@@ -1,0 +1,337 @@
+#:kivy 2.0.0
+#:import hex kivy.utils.get_color_from_hex
+
+# Globals: colors
+#:set BLACK 0, 0, 0, 1
+#:set BLUE 0, 0, 1, 1
+#:set DODGER_BLUE 30/255, 144/255, 1, 1
+#:set GRAY 0.5, 0.5, 0.5, 1
+#:set GREEN 0, 1, 0, 1
+#:set NAVY 0, 0, 0.5, 1
+#:set RED 1, 0, 0, 1
+#:set ROYAL_BLUE 65/255, 105/255, 225/255, 1
+#:set SILVER 192/255, 192/255, 192/255, 1
+#:set WHITE 1, 1, 1, 1
+#:set YELLOW 0.9, 0.9, 0, 1
+
+# Globals: sizing
+#:set HEADER_HEIGHT 40
+#:set CONTROLS_HEIGHT 40
+
+# Globals: GUI
+#:set GUI_COLOR NAVY
+#:set ARROW_DOWN "\u2193"
+#:set ARROW_LEFT "\u2190"
+#:set ARROW_RIGHT "\u2192"
+#:set ARROW_UP "\u2191"
+#:set ARROW_ANTICLOCKWISE "\u21BA"
+#:set ARROW_CLOCKWISE "\u21BB"
+#:set BLOCK_LEFT "\u258C"
+#:set BLOCK_RIGHT "\u2590"
+#:set EM_DASH "\u2014"
+#:set EN_DASH "\u2013"
+#:set IOTA "\u0196"
+#:set LINE_VERTICAL "\u007C"
+#:set SQUARE "\u25A0"
+#:set TRIANGLE_DOWN "\u25BC"
+#:set TRIANGLE_LEFT "\u25C4"
+#:set TRIANGLE_RIGHT "\u25BA"
+#:set TRIANGLE_UP "\u25B2"
+
+#
+# Helper Widgets
+#
+<FileLoadDialog>:
+    BoxLayout:
+        id: id_box
+        orientation: "vertical"
+        size: root.size
+        pos: root.pos
+        file_chooser: id_file_chooser.__self__
+        FileChooserListView:
+            id: id_file_chooser
+            dirselect: True
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+            Button:
+                text: "Load"
+                on_release: root.load(id_file_chooser.path, id_file_chooser.selection)
+
+<Header@BoxLayout>:
+    font_color: 1, 1, 1, 1
+    header_color: 0, 0, 0, 1
+    header_text: ""
+    size_hint: 1, None
+    height: dp(HEADER_HEIGHT)
+    canvas:
+        Color:
+            rgba: self.header_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    Label:
+        color: root.font_color
+        text: root.header_text
+        bold: True
+
+<RoundedButton@BoxLayout>:
+    orientation: "horizontal"
+    text: ""
+    text_size: sp(15)
+    callback: app.btn_dummy
+    Separator:
+        line_color: BLACK
+        width: dp(2)
+    Button:
+        id: id_btn
+        background_color: 0,0,0,0
+        bkgd_color: 0, 0, 1, 1
+        btn_radius: [dp(10),]
+        color: 1,1,1,1  # button text
+        font_name: "Arial"
+        font_size: root.text_size
+        padding: (dp(10), dp(10))
+        text: root.text
+        on_release: root.callback()
+        canvas.before:
+            Color:
+                rgba: ROYAL_BLUE if self.state == "normal" else DODGER_BLUE
+            RoundedRectangle:
+                size: self.size
+                pos: self.pos
+                radius: [dp(10),]
+    Separator:
+        line_color: BLACK
+        width: dp(2)
+
+<Separator@Label>:
+    line_color: 1, 1, 1, 1
+    direction: "vertical"
+    size_hint: (1.0, None) if self.direction == "horizontal" else (None, 1.0)
+    height: dp(1)
+    width: dp(1)
+    canvas.before:
+        Color:
+            rgba: self.line_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+<Node>:
+    cols: 2
+    rows: 1
+    padding: [dp(10), dp(10), dp(10), dp(10)]
+    size_hint: (1, None)
+    size: (0, dp(80))
+    BoxLayout:
+        size_hint_x: None
+        width: dp(40)
+        Label:
+            text: root.node_number
+    Button:
+        halign: "center"
+        valign: "middle"
+        text_size: self.size
+        text: root.node_text
+        color: 0, 0, 0, 1
+        on_press: app.btn_node_press(self)
+        background_normal: ""
+        background_color: root.bkgd_color
+
+<Config>:
+    cols: 2
+    rows: 1
+    padding: [dp(10), dp(10), dp(10), dp(10)]
+    size_hint: (1, None)
+    size: (0, dp(80))
+    BoxLayout:
+        size_hint_x: None
+        width: dp(80)
+        Label:
+            halign: "left"
+            valign: "middle"
+            text_size: self.size
+            text: root.config_key
+    Button:
+        halign: "center"
+        valign: "middle"
+        text_size: self.size
+        text: root.config_value
+
+
+# Experimental
+<DownArrow@Label>:
+    size_hint: 1.0, None
+    height: dp(20)
+    base_width: 100
+    base_height: 100
+    canvas:
+        PushMatrix:
+        Scale:
+            origin: self.pos
+            x: self.width / self.base_width
+            y: self.height / self.base_height
+        Color:
+            rgba: WHITE
+        Line:
+            points: (self.x + 50, self.y + 0, self.x + 50, self.y + 100)
+            width: dp(1)
+        Line:
+            points: (self.x + 48, self.y + 50, self.x + 50, self.y + 0, self.x + 52, self.y + 50)
+            width: dp(1)
+        PopMatrix:
+
+
+#
+# Pipeline Widgets
+#
+<PipelineNodesScroll@ScrollView>:
+    view: pipeline_layout
+    BoxLayout:
+        id: pipeline_layout
+        orientation: "vertical"
+        size_hint: (1, None)
+        height: self.minimum_height
+
+<PipelineConfigScroll@ScrollView>:
+    view: config_layout
+    BoxLayout:
+        id: config_layout
+        orientation: "vertical"
+        size_hint: (1, None)
+        height: self.minimum_height
+
+
+<NodeControls@BoxLayout>:
+    padding: 10
+    spacing: 10
+    RoundedButton:
+        text: "+"
+        text_size: sp(20)
+    RoundedButton:
+        text: EN_DASH
+    RoundedButton:
+        text: TRIANGLE_UP
+    RoundedButton:
+        text: TRIANGLE_DOWN
+
+<ConfigControls@BoxLayout>:
+    padding: 10
+    spacing: 10
+    RoundedButton:
+        text: "+"
+        text_size: sp(20)
+    RoundedButton:
+        text: EN_DASH
+
+<PipelineControls@BoxLayout>:
+    padding: 6
+    spacing: 10
+    RoundedButton:
+        text: "Load"
+        callback: app.btn_load_file
+    RoundedButton:
+        text: "Save"
+        callback: app.btn_save_file
+    RoundedButton:
+        text: "Quit"
+        callback: app.btn_quit
+
+#
+# PeekingDuck Output Widgets
+#
+<PeekingDuckOutput@GridLayout>:
+    cols: 1
+    rows: 1
+    Label:
+        text: "Output"
+
+<PeekingDuckControls@BoxLayout>:
+    padding: 6
+    spacing: 10
+    RoundedButton:
+        text: TRIANGLE_RIGHT
+        text_size: sp(20)
+    RoundedButton:
+        text: "||"
+    RoundedButton:
+        text: LINE_VERTICAL + TRIANGLE_LEFT
+    RoundedButton:
+        text: TRIANGLE_LEFT + TRIANGLE_LEFT
+    RoundedButton:
+        text: TRIANGLE_RIGHT + TRIANGLE_RIGHT
+
+
+#
+# Main Views: Left, Right
+#
+<PipelineView@BoxLayout>:
+    orientation: "vertical"
+    Header:
+        id: pipeline_header
+        header_color: GUI_COLOR
+        header_text: "Pipeline"
+
+    PipelineNodesScroll:
+        id: pipeline_nodes
+
+    NodeControls:
+        id: node_controls
+        size_hint_y: None
+        height: dp(CONTROLS_HEIGHT)
+    Separator:
+        direction: "horizontal"
+        line_color: BLACK
+
+    Header:
+        id: pipeline_config_header
+        header_color: GUI_COLOR
+        header_text: "Node Config"
+    PipelineConfigScroll:
+        id: pipeline_config
+        size_hint: 1.0, 0.5
+
+    ConfigControls:
+        id: config_controls
+        pos_hint: {"center_x": 0.5}
+        size_hint: 0.5, None
+        height: dp(CONTROLS_HEIGHT)
+    Separator:
+        direction: "horizontal"
+        line_color: BLACK
+
+    PipelineControls:
+        id: pipeline_controls
+        size_hint_y: None
+        height: dp(CONTROLS_HEIGHT)
+
+<PeekingDuckView@BoxLayout>:
+    orientation: "vertical"
+    Header:
+        id: pkd_header
+        header_color: GUI_COLOR
+        header_text: "PeekingDuck"
+    PeekingDuckOutput:
+        id: pkd_output
+    PeekingDuckControls:
+        id: pkd_controls
+        size_hint_y: None
+        height: dp(CONTROLS_HEIGHT)
+
+
+#
+# Main Screen
+#
+<ScreenOne>:
+    BoxLayout:
+        PipelineView:
+            id: pipeline_view
+            size_hint: 0.3, 1.0
+        Separator:
+            line_color: GUI_COLOR
+        PeekingDuckView:
+            id: pkd_view

@@ -8,7 +8,7 @@ from kivy.uix.floatlayout import FloatLayout
 
 
 NODE_RGB_COLOR = {
-    "augment": (255, 255, 255),
+    "augment": (153, 153, 153),
     "dabble": (120, 117, 188),
     "draw": (240, 115, 81),
     "input": (240, 224, 156),
