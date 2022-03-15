@@ -41,3 +41,26 @@ GUI:
     +-------------------+--------------------------------------+
 
 
+#
+# Kivy widget canvas drawing
+#
+<DownArrow@Label>:
+    size_hint: 1.0, None
+    height: dp(20)
+    base_width: 100
+    base_height: 100
+    canvas:
+        PushMatrix:
+        Scale:
+            origin: self.pos
+            x: self.width / self.base_width
+            y: self.height / self.base_height
+        Color:
+            rgba: WHITE
+        Line:
+            points: (self.x + 50, self.y + 0, self.x + 50, self.y + 100)
+            width: dp(1)
+        Line:
+            points: (self.x + 48, self.y + 50, self.x + 50, self.y + 0, self.x + 52, self.y + 50)
+            width: dp(1)
+        PopMatrix:
