@@ -101,6 +101,12 @@ def get_node_type(node_title: str) -> str:
     return node_type
 
 
+def get_node_color(node_title: str):
+    node_type = get_node_type(node_title)
+    node_color = NODE_RGBA_COLOR[node_type]
+    return node_color
+
+
 class pkdguiApp(App):
     def build(self):
         self.title = "PeekingDuck GUI"
@@ -135,6 +141,8 @@ class pkdguiApp(App):
         self.pipeline_config_header = pipeline_config_header
         pipeline_config = pipeline_view.ids["pipeline_config"]
         self.config_layout = pipeline_config.ids["config_layout"]
+        pipeline_nodes = pipeline_view.ids["pipeline_nodes"]
+        self.nodes_layout = pipeline_nodes.ids["pipeline_layout"]
 
     def set_pipeline_header(self, text: str):
         self.pipeline_header.header_text = text
@@ -254,6 +262,12 @@ class pkdguiApp(App):
     # File operations
     #####################
     def load_file(self, path: str, file_paths: List[str]):
+        """Method to load PeekingDuck pipeline configuration yaml file
+
+        Args:
+            path (str): Path containing the pipeline configuration yaml file
+            file_paths (List[str]): Selected yaml file(s)
+        """
         print(f"path={path}, file_paths={file_paths}")
         self._file_dialog.dismiss()
         self.pipeline_file_path = file_paths[0]  # only want first file
@@ -265,25 +279,20 @@ class pkdguiApp(App):
     # Pipeline processing
     #####################
     def parse_pipeline(self):
-        # prepare pipeline nodes layout
-        screen = self.screen_one
-        pipeline_view = screen.ids["pipeline_view"]
-        pipeline_nodes = pipeline_view.ids["pipeline_nodes"]
-        nodes_layout = pipeline_nodes.ids["pipeline_layout"]
-        nodes_layout.clear_widgets()
-
-        # decode pipeline and cache in self
-        print(f"self.pipeline: {self.pipeline_file_path}")
-        print(self.pipeline)
-        pipeline_nodes = self.pipeline["nodes"]
+        """Method to parse the loaded pipeline and create graphical layout of
+        pipeline nodes. A copy of the pipeline is cached within self (App).
+        """
+        self.nodes_layout.clear_widgets()
+        self.pipeline_nodes = dict()  # start new data structure
+        # decode pipeline
+        loaded_pipeline_nodes = self.pipeline["nodes"]
         # set header
-        num_nodes = len(pipeline_nodes)
+        num_nodes = len(loaded_pipeline_nodes)
         toks = self.pipeline_file_path.split("/")
         filename = toks[-1]
         self.set_pipeline_header(f"{filename}, {num_nodes} nodes")
         # decode nodes
-        self.pipeline_nodes = dict()  # start new data structure
-        for i, node in enumerate(pipeline_nodes):
+        for i, node in enumerate(loaded_pipeline_nodes):
             if isinstance(node, str):
                 node_title = node
                 node_config = [{"None": "No Config"}]
@@ -294,19 +303,15 @@ class pkdguiApp(App):
                 for k, v in config_dd.items():
                     kv_dict = {k: v}
                     node_config.append(kv_dict)
-
+            # cache pipeline by adding to App
             self.pipeline_nodes[node_title] = node_config
-
+            # create Node widget
             node_num = str(i + 1)
-            # toks = node_title.split(".")
-            # node_type = toks[1] if toks[0] == "custom_nodes" else toks[0]
-            node_type = get_node_type(node_title)
-            node_color = NODE_RGBA_COLOR[node_type]
-
+            node_color = get_node_color(node_title)
             node = Node(
                 bkgd_color=node_color, node_number=node_num, node_text=node_title
             )
-            nodes_layout.add_widget(node)
+            self.nodes_layout.add_widget(node)
 
 
 if __name__ == "__main__":
