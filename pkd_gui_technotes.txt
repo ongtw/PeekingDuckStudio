@@ -64,3 +64,48 @@ GUI:
             points: (self.x + 48, self.y + 50, self.x + 50, self.y + 0, self.x + 52, self.y + 50)
             width: dp(1)
         PopMatrix:
+
+
+#
+# Data structures to support efficient pipeline node re-ordering
+#
+
+N = number of nodes
+map : i -> node
+rmap : node -> i
+
+traversal/display:
+    for i = 1 to N
+        node = map[i]
+        draw(node)
+
+move node i up:
+    if i > 1:
+        prev_node = map[i - 1]
+
+        map[i - 1] = node
+        rmap[node] = i - 1
+
+        map[i] = prev_node
+        rmap[prev_node] = i
+
+move node i down:
+    if i < N:
+        next_node = map[i + 1]
+
+        map[i + 1] = node
+        rmap[node] = i + 1
+
+        map[i] = next_node
+        rmap[next_node] = i
+
+
+
+
+
+
+
+
+
+
+

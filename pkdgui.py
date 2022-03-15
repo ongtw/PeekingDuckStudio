@@ -31,6 +31,8 @@ from re import A
 from typing import Dict, List
 import yaml
 
+from config_parser import ConfigParser
+
 from kivy.config import Config
 
 # change window size from 800x600 to 1024x768 (must be before other kivy modules)
@@ -109,7 +111,11 @@ def get_node_color(node_title: str):
 
 class pkdguiApp(App):
     def build(self):
+        """
+        Main Kivy application entry point
+        """
         self.title = "PeekingDuck GUI"
+
         sm = ScreenManager()
         self.screen_one = ScreenOne(name="screen_one")
         sm.add_widget(self.screen_one)
@@ -122,6 +128,13 @@ class pkdguiApp(App):
         self.selected_configs = set()
         self.setup_output()
         self.setup_key_widgets()
+
+        self.num_nodes = 0
+        self.idx_to_node = None
+        self.node_to_idx = None
+
+        self.config_parser = ConfigParser()
+
         return sm
 
     # App GUI Widget Access
@@ -141,8 +154,9 @@ class pkdguiApp(App):
         self.pipeline_config_header = pipeline_config_header
         pipeline_config = pipeline_view.ids["pipeline_config"]
         self.config_layout = pipeline_config.ids["config_layout"]
-        pipeline_nodes = pipeline_view.ids["pipeline_nodes"]
-        self.nodes_layout = pipeline_nodes.ids["pipeline_layout"]
+        pipeline_nodes_view = pipeline_view.ids["pipeline_nodes"]
+        self.pipeline_nodes_view = pipeline_nodes_view
+        self.nodes_layout = pipeline_nodes_view.ids["pipeline_layout"]
 
     def set_pipeline_header(self, text: str):
         self.pipeline_header.header_text = text
@@ -218,7 +232,7 @@ class pkdguiApp(App):
             self.set_node_config_header(node_title, color=node_color, font_color=BLACK)
         else:
             self.set_node_config_header(node_title, color=node_color, font_color=WHITE)
-        node_config = self.pipeline_nodes[node_title]
+        node_config = self.pipeline_nodes_to_configs[node_title]
         self.set_node_config(node_config)
 
     def btn_load_file(self, btn, *args):
@@ -278,19 +292,92 @@ class pkdguiApp(App):
     #####################
     # Pipeline processing
     #####################
+    def btn_node_up(self, *args):
+        # print(f"btn_node_up, selected={self.selected_nodes}")
+        if self.selected_nodes:
+            for node in self.selected_nodes:
+                self.node_map_move_up(node)
+            self.node_map_draw()
+            self.pipeline_nodes_view.scroll_to(node)
+
+    def btn_node_down(self, *args):
+        # print(f"btn_node_down, selected={self.selected_nodes}")
+        if self.selected_nodes:
+            for node in self.selected_nodes:
+                self.node_map_move_down(node)
+            self.node_map_draw()
+            self.pipeline_nodes_view.scroll_to(node)
+
+    def setup_node_map(self, num_nodes):
+        self.num_nodes = num_nodes
+        self.idx_to_node = [None] * num_nodes
+        self.node_to_idx = dict()
+
+    def node_map_add(self, node, i: int):
+        assert i >= 0
+        assert i < self.num_nodes
+        self.idx_to_node[i] = node
+        self.node_to_idx[node] = i
+        node.node_number = str(i + 1)
+
+    def node_map_move_up(self, node):
+        """Move towards start of pipeline
+
+        Args:
+            node (_type_): node to be moved
+        """
+        j = self.node_to_idx[node]
+        if j > 0:
+            i = j - 1
+            prev_node = self.idx_to_node[i]
+            self.idx_to_node[i] = node
+            self.node_to_idx[node] = i
+            node.node_number = str(i + 1)
+            self.idx_to_node[j] = prev_node
+            self.node_to_idx[prev_node] = j
+            prev_node.node_number = str(j + 1)
+
+    def node_map_move_down(self, node):
+        """Move towards end of pipeline
+
+        Args:
+            node (_type_): node to be moved
+        """
+        i = self.node_to_idx[node]
+        j = i + 1
+        if j < self.num_nodes:
+            next_node = self.idx_to_node[j]
+            self.idx_to_node[j] = node
+            self.node_to_idx[node] = j
+            node.node_number = str(j + 1)
+            self.idx_to_node[i] = next_node
+            self.node_to_idx[next_node] = i
+            next_node.node_number = str(i + 1)
+
+    def node_map_draw(self):
+        """Redraw pipeline nodes layout"""
+        self.nodes_layout.clear_widgets()
+        for i in range(self.num_nodes):
+            node = self.idx_to_node[i]
+            self.nodes_layout.add_widget(node)
+
     def parse_pipeline(self):
         """Method to parse the loaded pipeline and create graphical layout of
         pipeline nodes. A copy of the pipeline is cached within self (App).
         """
-        self.nodes_layout.clear_widgets()
-        self.pipeline_nodes = dict()  # start new data structure
+        # self.nodes_layout.clear_widgets()
+        self.pipeline_nodes_to_configs = dict()  # start new data structure
         # decode pipeline
+        print(f"self.pipeline: {type(self.pipeline)}")
         loaded_pipeline_nodes = self.pipeline["nodes"]
         # set header
         num_nodes = len(loaded_pipeline_nodes)
         toks = self.pipeline_file_path.split("/")
         filename = toks[-1]
         self.set_pipeline_header(f"{filename}, {num_nodes} nodes")
+
+        self.setup_node_map(num_nodes)
+
         # decode nodes
         for i, node in enumerate(loaded_pipeline_nodes):
             if isinstance(node, str):
@@ -304,14 +391,17 @@ class pkdguiApp(App):
                     kv_dict = {k: v}
                     node_config.append(kv_dict)
             # cache pipeline by adding to App
-            self.pipeline_nodes[node_title] = node_config
+            self.pipeline_nodes_to_configs[node_title] = node_config
             # create Node widget
             node_num = str(i + 1)
             node_color = get_node_color(node_title)
             node = Node(
                 bkgd_color=node_color, node_number=node_num, node_text=node_title
             )
-            self.nodes_layout.add_widget(node)
+            # self.nodes_layout.add_widget(node)
+            self.node_map_add(node, i)
+
+        self.node_map_draw()
 
 
 if __name__ == "__main__":
