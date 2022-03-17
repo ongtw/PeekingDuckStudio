@@ -25,6 +25,7 @@ NODE_COLOR_SELECTED = (0, 0, 1, 0.5)
 NODE_COLOR_CLEAR = (0, 0, 1, 0)
 CONFIG_COLOR_SELECTED = (0.5, 0.5, 0.5, 0.5)
 CONFIG_COLOR_CLEAR = (0.5, 0.5, 0.5, 0)
+BUTTON_DELAY = 0.2
 
 # Imports
 from re import A
@@ -128,6 +129,7 @@ class pkdguiApp(App):
         self.selected_configs = set()
         self.setup_output()
         self.setup_key_widgets()
+        self.setup_gui_working_vars()
 
         self.num_nodes = 0
         self.idx_to_node = None
@@ -157,6 +159,11 @@ class pkdguiApp(App):
         pipeline_nodes_view = pipeline_view.ids["pipeline_nodes"]
         self.pipeline_nodes_view = pipeline_nodes_view
         self.nodes_layout = pipeline_nodes_view.ids["pipeline_layout"]
+
+    def setup_gui_working_vars(self):
+        # pre-declare working vars to avoid code crashing on var not found errors
+        self.btn_node_move_down_held = None
+        self.btn_node_move_up_held = None
 
     def set_pipeline_header(self, text: str):
         self.pipeline_header.header_text = text
@@ -194,12 +201,13 @@ class pkdguiApp(App):
 
     # App GUI Event Callbacks
     # Buttons
-    def btn_dummy(self, btn, *args):
+    def btn_press(self, btn, *args):
         parent = btn.parent
-        if parent.tag:
-            print(f"btn_dummy: {parent.tag}")
-        else:
-            print("btn_dummy: nothing at all")
+        print(f"btn_press: {btn.text} tag={parent.tag}")
+
+    def btn_release(self, btn, *args):
+        parent = btn.parent
+        print(f"btn_release: {btn.text} tag={parent.tag}")
 
     def btn_config_press(self, btn, *args):
         """This method is called when a node config is clicked
@@ -292,21 +300,39 @@ class pkdguiApp(App):
     #####################
     # Pipeline processing
     #####################
-    def btn_node_up(self, *args):
-        # print(f"btn_node_up, selected={self.selected_nodes}")
+    def btn_node_move_up_press(self, *args):
+        # print(f"btn_node_move_up, selected={self.selected_nodes}")
         if self.selected_nodes:
             for node in self.selected_nodes:
                 self.node_map_move_up(node)
             self.node_map_draw()
             self.pipeline_nodes_view.scroll_to(node)
+            self.btn_node_move_up_held = Clock.schedule_once(
+                self.btn_node_move_up_press, BUTTON_DELAY
+            )
 
-    def btn_node_down(self, *args):
-        # print(f"btn_node_down, selected={self.selected_nodes}")
+    def btn_node_move_up_release(self, *args):
+        if self.btn_node_move_up_held:
+            self.btn_node_move_up_held.cancel()
+
+    def btn_node_move_down_press(self, *args):
+        # print(f"btn_node_move_down, selected={self.selected_nodes}")
         if self.selected_nodes:
             for node in self.selected_nodes:
                 self.node_map_move_down(node)
             self.node_map_draw()
             self.pipeline_nodes_view.scroll_to(node)
+            self.btn_node_move_down_held = Clock.schedule_once(
+                self.btn_node_move_down_press, BUTTON_DELAY
+            )
+
+    def btn_node_move_down_release(self, *args):
+        if self.btn_node_move_down_held:
+            self.btn_node_move_down_held.cancel()
+
+    def btn_verify_pipeline(self, *args):
+        res = self.config_parser.verify_config(self.idx_to_node)
+        print(res)
 
     def setup_node_map(self, num_nodes):
         self.num_nodes = num_nodes

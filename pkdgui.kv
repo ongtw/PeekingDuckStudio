@@ -82,7 +82,8 @@
     orientation: "horizontal"
     text: ""
     text_size: sp(15)
-    callback: app.btn_dummy
+    callback_btn_press: app.btn_press
+    callback_btn_release: app.btn_release
     tag: ""
     Separator:
         line_color: BLACK
@@ -97,7 +98,8 @@
         font_size: root.text_size
         padding: (dp(10), dp(10))
         text: root.text
-        on_release: root.callback(self)
+        on_press: root.callback_btn_press(self)
+        on_release: root.callback_btn_release(self)
         canvas.before:
             Color:
                 rgba: ROYAL_BLUE if self.state == "normal" else DODGER_BLUE
@@ -184,6 +186,7 @@
 #
 <PipelineNodesScroll@ScrollView>:
     view: pipeline_layout
+    scroll_wheel_distance: 40
     BoxLayout:
         id: pipeline_layout
         orientation: "vertical"
@@ -212,11 +215,13 @@
     RoundedButton:
         tag: "node_up"
         text: TRIANGLE_UP
-        callback: app.btn_node_up
+        callback_btn_press: app.btn_node_move_up_press
+        callback_btn_release: app.btn_node_move_up_release
     RoundedButton:
         tag: "node_down"
         text: TRIANGLE_DOWN
-        callback: app.btn_node_down
+        callback_btn_press: app.btn_node_move_down_press
+        callback_btn_release: app.btn_node_move_down_release
 
 <ConfigControls@BoxLayout>:
     padding: 10
@@ -234,13 +239,13 @@
     spacing: 10
     RoundedButton:
         text: "Load"
-        callback: app.btn_load_file
+        callback_btn_press: app.btn_load_file
     RoundedButton:
         text: "Save"
-        callback: app.btn_save_file
+        callback_btn_press: app.btn_save_file
     RoundedButton:
         text: "Quit"
-        callback: app.btn_quit
+        callback_btn_press: app.btn_quit
 
 #
 # PeekingDuck Output Widgets
@@ -258,6 +263,7 @@
         tag: "play/stop"
         text: TRIANGLE_RIGHT
         text_size: sp(20)
+        callback_btn_press: app.btn_verify_pipeline
     RoundedButton:
         tag: "pause"
         text: "||"
