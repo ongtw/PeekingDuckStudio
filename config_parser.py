@@ -8,7 +8,7 @@ def get_peekingduck_path() -> Path:
     return Path(pkd_path)
 
 
-class ConfigParser:
+class NodeConfigParser:
     def __init__(self) -> None:
         self.pkd_path = get_peekingduck_path()
         self.config_path = self.pkd_path / "configs"
@@ -66,13 +66,15 @@ class ConfigParser:
                 node_input = node_config["input"]
                 node_output = node_config["output"]
                 # check input
+                node_error = []
                 for the_input in node_input:
                     if the_input not in ["all", "none"]:
                         if the_input not in data_types_available:
                             print(f"data_types: {data_types_available}")
                             print(f"'{the_input}' not available")
-                            pipeline_errors.append(i)
-                            break  # just need one error
+                            node_error.append(the_input)
+                if node_error:
+                    pipeline_errors.append([i, node_error])
                 # check output
                 for the_output in node_output:
                     if the_output != "none":
@@ -93,7 +95,7 @@ class ConfigParser:
 
 
 def main():
-    config_parser = ConfigParser()
+    config_parser = NodeConfigParser()
     # config_parser.debug_configs()
     print(config_parser.nodes_list)
     print(config_parser.nodes_by_type)
