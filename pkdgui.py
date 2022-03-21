@@ -77,6 +77,17 @@ from config_parser import NodeConfigParser
 # - PKD playback
 
 
+#
+# Kivy widget classes
+#
+class Config(GridLayout):
+    bkgd_color = ListProperty([0, 0, 1, 1])
+    select_color = ListProperty([0, 0, 0, 0])
+    config_key = ObjectProperty("key")
+    config_value = ObjectProperty("value")
+    config_set = BooleanProperty(False)
+
+
 class FileLoadDialog(FloatLayout):
     select = ObjectProperty(None)  # map to file/path selected method
     cancel = ObjectProperty(None)  # map to cancel method
@@ -95,14 +106,6 @@ class Node(GridLayout):
     node_text = ObjectProperty("")
 
 
-class Config(GridLayout):
-    bkgd_color = ListProperty([0, 0, 1, 1])
-    select_color = ListProperty([0, 0, 0, 0])
-    config_key = ObjectProperty("key")
-    config_value = ObjectProperty("value")
-    config_set = BooleanProperty(False)
-
-
 class Output(GridLayout):
     def on_touch_down(self, touch):
         # if self.collide_point(*touch.pos):
@@ -113,6 +116,14 @@ class Output(GridLayout):
 class ProjectInfo(GridLayout):
     directory = StringProperty("")
     filename = StringProperty("")
+
+
+class RoundedButton(BoxLayout):
+    color_bkgd = ListProperty([0, 0, 0, 0])
+    color_normal = ListProperty([65 / 255, 105 / 255, 225 / 255, 1])
+    color_pressed = ListProperty([30 / 255, 144 / 255, 1, 1])
+    color_separator = ListProperty([0, 0, 0, 1])
+    color_text = ListProperty([1, 1, 1, 1])
 
 
 class ScreenPipeline(Screen):
@@ -155,8 +166,9 @@ class pkdguiApp(App):
         Window.top = 100
 
         self.play = "stop"
-        self.selected_nodes = set()
-        self.selected_configs = set()
+        self.selected_node = None
+        self.all_selected_nodes = set()
+        self.all_selected_configs = set()
         self.setup_output()
         self.setup_key_widgets()
         self.setup_gui_working_vars()
@@ -180,15 +192,15 @@ class pkdguiApp(App):
     def setup_key_widgets(self):
         screen = self.screen_pipeline
         self.project_info = screen.ids["project_info"]
-        pipeline_view = screen.ids["pipeline_view"]
-        pipeline_header = pipeline_view.ids["pipeline_header"]
+        self.pipeline_view = screen.ids["pipeline_view"]
+        pipeline_header = self.pipeline_view.ids["pipeline_header"]
         self.pipeline_header = pipeline_header
-        pipeline_config_header = pipeline_view.ids["pipeline_config_header"]
+        pipeline_config_header = self.pipeline_view.ids["pipeline_config_header"]
         self.pipeline_config_header = pipeline_config_header
-        pipeline_config = pipeline_view.ids["pipeline_config"]
+        pipeline_config = self.pipeline_view.ids["pipeline_config"]
         self.pipeline_config = pipeline_config
         self.config_layout = pipeline_config.ids["config_layout"]
-        pipeline_nodes_view = pipeline_view.ids["pipeline_nodes"]
+        pipeline_nodes_view = self.pipeline_view.ids["pipeline_nodes"]
         self.pipeline_nodes_view = pipeline_nodes_view
         self.nodes_layout = pipeline_nodes_view.ids["pipeline_layout"]
 
@@ -198,10 +210,10 @@ class pkdguiApp(App):
         self.btn_node_move_up_held = None
 
     # Change headers
-    def set_pipeline_header(self, text: str):
+    def set_pipeline_header(self, text: str) -> None:
         self.pipeline_header.header_text = text
 
-    def set_node_config_header(self, text: str, color=None, font_color=None):
+    def set_node_config_header(self, text: str, color=None, font_color=None) -> None:
         header = self.pipeline_config_header
         header.header_text = text
         if color:
@@ -209,64 +221,104 @@ class pkdguiApp(App):
         if font_color:
             header.font_color = font_color
 
-    def set_output_header(self, text: str):
+    def set_output_header(self, text: str) -> None:
         self.output_header.header_text = text
 
-    def set_node_config(self, node_title: str, node_config):
+    def show_node_configs(self) -> None:
+        """Shows configuration for given node
+
+        Args:
+            node_title (str): name of node, e.g. `input.visual`
+            node_config (_type_): configuration of node
+        """
+        if self.selected_node is None:
+            return
+        node_title = self.selected_node.button.text
+        node_type = get_node_type(node_title)
+        node_color = NODE_RGBA_COLOR[node_type]
+        # update node config view
+        if node_type in ("input", "model"):
+            self.set_node_config_header(node_title, color=node_color, font_color=BLACK)
+        else:
+            self.set_node_config_header(node_title, color=node_color, font_color=WHITE)
+        node_config = self.pipeline_nodes_to_configs[node_title]
+
         config_layout = self.config_layout
         config_layout.clear_widgets()
         default_config = self.config_parser.title_config_map[node_title].copy()
         # replace default with user config
-        set_configs = set()
+        user_config_keys = set()
         for config in node_config:
             for k, v in config.items():
                 if k in default_config:
-                    set_configs.add(k)
+                    user_config_keys.add(k)
                     default_config[k] = v
-        # show consolidated config
+        # show default config with user overrides
+        show_all: bool = self.pipeline_view.config_state == "expand"
+        no_config: bool = True
         for k, v in default_config.items():
             if k not in NODE_CONFIG_RESERVED_KEYS:
-                tick = k in set_configs
-                config = Config(config_key=str(k), config_value=str(v), config_set=tick)
-                config_layout.add_widget(config)
+                tick = k in user_config_keys
+                if show_all or tick:
+                    config = Config(
+                        config_key=str(k), config_value=str(v), config_set=tick
+                    )
+                    config_layout.add_widget(config)
+                    no_config = False
+        if no_config:
+            # add dummy widget showing "No Config" message
+            config = Config(
+                config_key="",
+                config_value="No user defined configurations",
+                config_set=False,
+            )
+            config_layout.add_widget(config)
         self.pipeline_config.scroll_y = 1.0  # move scrollview to top
 
-    def reset_node_config(self):
+    def clear_node_configs(self) -> None:
         self.config_layout.clear_widgets()
         self.set_node_config_header("Node Config", color=NAVY, font_color=WHITE)
 
-    def clear_selected_configs(self):
-        for config in self.selected_configs:
+    def clear_selected_configs(self) -> None:
+        for config in self.all_selected_configs:
             config.select_color = CONFIG_COLOR_CLEAR
-        self.selected_configs.clear()
+        self.all_selected_configs.clear()
 
-    def clear_selected_nodes(self):
-        for node in self.selected_nodes:
+    def clear_selected_nodes(self) -> None:
+        for node in self.all_selected_nodes:
             node.select_color = NODE_COLOR_CLEAR
-        self.selected_nodes.clear()
-        self.reset_node_config()
+        self.all_selected_nodes.clear()
+        self.clear_node_configs()
 
     # App GUI Event Callbacks
     # Buttons: generic dummy callbacks
-    def btn_press(self, btn, *args):
+    def btn_press(self, btn, *args) -> None:
         parent = btn.parent
         print(f"btn_press: {btn.text} tag={parent.tag}")
 
-    def btn_release(self, btn, *args):
+    def btn_release(self, btn, *args) -> None:
         parent = btn.parent
         print(f"btn_release: {btn.text} tag={parent.tag}")
 
     # Screen transitions
-    def goto_screen_pipeline(self, *args):
+    def goto_screen_pipeline(self, *args) -> None:
         self.sm.transition.direction = "right"
         self.sm.current = "screen_pipeline"
 
-    def goto_screen_playback(self, *args):
+    def goto_screen_playback(self, *args) -> None:
         self.sm.transition.direction = "left"
         self.sm.current = "screen_playback"
 
     # Buttons: Specific
-    def btn_config_press(self, btn, *args):
+    def toggle_config_state(self, *args) -> None:
+        """Toggle show all or only user-defined configurations"""
+        if self.pipeline_view.config_state == "expand":
+            self.pipeline_view.config_state = "contract"
+        else:
+            self.pipeline_view.config_state = "expand"
+        self.show_node_configs()
+
+    def btn_config_press(self, btn, *args) -> None:
         """This method is called when a node config is clicked
 
         Args:
@@ -276,9 +328,9 @@ class pkdguiApp(App):
         # set new selected config
         config = btn.parent
         config.select_color = CONFIG_COLOR_SELECTED
-        self.selected_configs.add(config)
+        self.all_selected_configs.add(config)
 
-    def btn_node_press(self, btn, *args):
+    def btn_node_press(self, btn, *args) -> None:
         """This method is called when a pipeline node is clicked
 
         Args:
@@ -288,19 +340,11 @@ class pkdguiApp(App):
         # set new selected node
         node = btn.parent
         node.select_color = NODE_COLOR_SELECTED
-        self.selected_nodes.add(node)
-        # update node config view
-        node_title = btn.text
-        node_type = get_node_type(node_title)
-        node_color = NODE_RGBA_COLOR[node_type]
-        if node_type in ("input", "model"):
-            self.set_node_config_header(node_title, color=node_color, font_color=BLACK)
-        else:
-            self.set_node_config_header(node_title, color=node_color, font_color=WHITE)
-        node_config = self.pipeline_nodes_to_configs[node_title]
-        self.set_node_config(node_title, node_config)
+        self.all_selected_nodes.add(node)
+        self.selected_node = node
+        self.show_node_configs()
 
-    def btn_load_file(self, btn, *args):
+    def btn_load_file(self, btn, *args) -> None:
         file_dialog = FileLoadDialog(select=self.load_file, cancel=self.cancel_load)
         file_dialog.setup(path=CURR_PATH, filters=FILE_FILTERS)
         self._file_dialog = Popup(
@@ -308,18 +352,18 @@ class pkdguiApp(App):
         )
         self._file_dialog.open()
 
-    def btn_save_file(self, btn, *args):
+    def btn_save_file(self, btn, *args) -> None:
         print("btn_save_file: not implemented yet")
 
-    def btn_quit(self, btn, *args):
+    def btn_quit(self, btn, *args) -> None:
         # todo: ask user to confirm quit / save changes
         self.stop()
 
-    def cancel_load(self):
+    def cancel_load(self) -> None:
         self._file_dialog.dismiss()
 
     # Playback controls
-    def btn_play_stop(self):
+    def btn_play_stop(self) -> None:
         print("btn_play_stop")
 
         # Touch events
@@ -340,7 +384,7 @@ class pkdguiApp(App):
     #####################
     # File operations
     #####################
-    def load_file(self, path: str, file_paths: List[str]):
+    def load_file(self, path: str, file_paths: List[str]) -> None:
         """Method to load PeekingDuck pipeline configuration yaml file
 
         Args:
@@ -362,10 +406,9 @@ class pkdguiApp(App):
     #####################
     # Pipeline processing
     #####################
-    def btn_node_move_up_press(self, *args):
-        # print(f"btn_node_move_up, selected={self.selected_nodes}")
-        if self.selected_nodes:
-            for node in self.selected_nodes:
+    def btn_node_move_up_press(self, *args) -> None:
+        if self.all_selected_nodes:
+            for node in self.all_selected_nodes:
                 self.node_map_move_up(node)
             self.node_map_draw()
             self.pipeline_nodes_view.scroll_to(node)
@@ -373,14 +416,13 @@ class pkdguiApp(App):
                 self.btn_node_move_up_press, BUTTON_DELAY
             )
 
-    def btn_node_move_up_release(self, *args):
+    def btn_node_move_up_release(self, *args) -> None:
         if self.btn_node_move_up_held:
             self.btn_node_move_up_held.cancel()
 
-    def btn_node_move_down_press(self, *args):
-        # print(f"btn_node_move_down, selected={self.selected_nodes}")
-        if self.selected_nodes:
-            for node in self.selected_nodes:
+    def btn_node_move_down_press(self, *args) -> None:
+        if self.all_selected_nodes:
+            for node in self.all_selected_nodes:
                 self.node_map_move_down(node)
             self.node_map_draw()
             self.pipeline_nodes_view.scroll_to(node)
@@ -388,23 +430,23 @@ class pkdguiApp(App):
                 self.btn_node_move_down_press, BUTTON_DELAY
             )
 
-    def btn_node_move_down_release(self, *args):
+    def btn_node_move_down_release(self, *args) -> None:
         if self.btn_node_move_down_held:
             self.btn_node_move_down_held.cancel()
 
-    def btn_verify_pipeline(self, *args):
+    def btn_verify_pipeline(self, *args) -> None:
         res = self.config_parser.verify_config(self.idx_to_node)
         print(res)
 
     ########################
     # Node layout management
     ########################
-    def setup_node_map(self, num_nodes):
+    def setup_node_map(self, num_nodes) -> None:
         self.num_nodes = num_nodes
         self.idx_to_node = [None] * num_nodes
         self.node_to_idx = dict()
 
-    def node_map_add(self, node, i: int):
+    def node_map_add(self, node, i: int) -> None:
         """Add node "node list" at given position index
 
         Args:
@@ -417,14 +459,14 @@ class pkdguiApp(App):
         self.node_to_idx[node] = i
         node.node_number = str(i + 1)
 
-    def node_map_draw(self):
+    def node_map_draw(self) -> None:
         """Redraw pipeline nodes layout"""
         self.nodes_layout.clear_widgets()
         for i in range(self.num_nodes):
             node = self.idx_to_node[i]
             self.nodes_layout.add_widget(node)
 
-    def node_map_move_up(self, node):
+    def node_map_move_up(self, node) -> None:
         """Move towards start of pipeline
 
         Args:
@@ -441,7 +483,7 @@ class pkdguiApp(App):
             self.node_to_idx[prev_node] = j
             prev_node.node_number = str(j + 1)
 
-    def node_map_move_down(self, node):
+    def node_map_move_down(self, node) -> None:
         """Move towards end of pipeline
 
         Args:
@@ -458,7 +500,7 @@ class pkdguiApp(App):
             self.node_to_idx[next_node] = i
             next_node.node_number = str(i + 1)
 
-    def parse_pipeline(self):
+    def parse_pipeline(self) -> None:
         """
         Method to parse the loaded pipeline and create graphical layout of pipeline
         nodes. A copy of the pipeline is cached within self (App).

@@ -78,37 +78,37 @@
         text: root.header_text
         bold: True
 
-<RoundedButton@BoxLayout>:
+#<RoundedButton@BoxLayout>:
+<RoundedButton>:
     orientation: "horizontal"
     text: ""
     text_size: sp(15)
-    callback_btn_press: app.btn_press
-    callback_btn_release: app.btn_release
+    callback_press: app.btn_press
+    callback_release: app.btn_release
     tag: ""
     Separator:
-        line_color: BLACK
+        line_color: root.color_separator
         width: dp(2)
     Button:
         id: id_btn
-        background_color: 0,0,0,0
-        bkgd_color: 0, 0, 1, 1
+        background_color: root.color_bkgd
         btn_radius: [dp(10),]
-        color: 1,1,1,1  # button text
+        color: root.color_text
         font_name: "Arial"
         font_size: root.text_size
         padding: (dp(10), dp(10))
         text: root.text
-        on_press: root.callback_btn_press(self)
-        on_release: root.callback_btn_release(self)
+        on_press: root.callback_press(self)
+        on_release: root.callback_release(self)
         canvas.before:
             Color:
-                rgba: ROYAL_BLUE if self.state == "normal" else DODGER_BLUE
+                rgba: root.color_normal if self.state == "normal" else root.color_pressed
             RoundedRectangle:
                 size: self.size
                 pos: self.pos
                 radius: [dp(10),]
     Separator:
-        line_color: BLACK
+        line_color: root.color_separator
         width: dp(2)
 
 <Separator@Label>:
@@ -125,6 +125,7 @@
             pos: self.pos
 
 <Node>:
+    button: id_button
     cols: 2
     rows: 1
     padding: [dp(10), dp(10), dp(10), dp(10)]
@@ -143,6 +144,7 @@
         Label:
             text: root.node_number
     Button:
+        id: id_button
         halign: "center"
         valign: "middle"
         text_size: self.size
@@ -251,35 +253,36 @@
     RoundedButton:
         tag: "node_up"
         text: TRIANGLE_UP
-        callback_btn_press: app.btn_node_move_up_press
-        callback_btn_release: app.btn_node_move_up_release
+        callback_press: app.btn_node_move_up_press
+        callback_release: app.btn_node_move_up_release
     RoundedButton:
         tag: "node_down"
         text: TRIANGLE_DOWN
-        callback_btn_press: app.btn_node_move_down_press
-        callback_btn_release: app.btn_node_move_down_release
+        callback_press: app.btn_node_move_down_press
+        callback_release: app.btn_node_move_down_release
 
 <PipelineControls@BoxLayout>:
     padding: 6
     spacing: 10
     RoundedButton:
         text: "Load"
-        callback_btn_press: app.btn_load_file
+        callback_press: app.btn_load_file
     RoundedButton:
         text: "Save"
-        callback_btn_press: app.btn_save_file
+        callback_press: app.btn_save_file
     RoundedButton:
         text: "Run"
-        callback_btn_press: app.goto_screen_playback
+        callback_press: app.goto_screen_playback
     RoundedButton:
         text: "Quit"
-        callback_btn_press: app.btn_quit
+        callback_press: app.btn_quit
 
 
 #
 # Pipline Editor View
 #
 <PipelineView@BoxLayout>:
+    config_state: "contract"
     BoxLayout:
         orientation: "vertical"
         size_hint_x: 0.4
@@ -306,10 +309,41 @@
 
     BoxLayout:
         orientation: "vertical"
-        Header:
-            id: pipeline_config_header
-            header_color: GUI_COLOR
-            header_text: "Node Config"
+        BoxLayout:
+            size_hint: 1, None
+            height: dp(HEADER_HEIGHT)
+            BoxLayout:
+                size_hint_x: None
+                size_hint_x_max: dp(20)
+                canvas.before:
+                    Color:
+                        rgba: GUI_COLOR
+                    Rectangle:
+                        size: self.size
+                        pos: self.pos
+                RoundedButton:
+                    color: pipeline_header.font_color
+                    color_normal: GUI_COLOR
+                    color_pressed: GUI_COLOR
+                    color_separator: GUI_COLOR
+                    text:
+                        "" if root.config_state == "" else TRIANGLE_DOWN \
+                        if root.config_state == "expand" else TRIANGLE_RIGHT
+                    callback_release: app.toggle_config_state
+                    tag: "expand"
+            Header:
+                id: pipeline_config_header
+                header_color: GUI_COLOR
+                header_text: "Node Config"
+            BoxLayout:
+                size_hint_x: None
+                size_hint_x_max: dp(20)
+                canvas.before:
+                    Color:
+                        rgba: pipeline_config_header.header_color
+                    Rectangle:
+                        size: self.size
+                        pos: self.pos
         Separator:
             direction: "horizontal"
             line_color: BLACK
@@ -420,14 +454,14 @@
         tag: "play/stop"
         text: TRIANGLE_RIGHT
         text_size: sp(20)
-        callback_btn_press: app.btn_verify_pipeline
+        callback_press: app.btn_verify_pipeline
     RoundedButton:
         tag: "pause"
         text: "||"
     RoundedButton:
         tag: "rewind"
         text: LINE_VERTICAL + TRIANGLE_LEFT
-        callback_btn_press: app.goto_screen_pipeline
+        callback_press: app.goto_screen_pipeline
     RoundedButton:
         tag: "backward"
         text: TRIANGLE_LEFT + TRIANGLE_LEFT
