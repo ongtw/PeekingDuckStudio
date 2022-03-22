@@ -42,21 +42,9 @@ Config.set("graphics", "resizable", False)
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
-from kivy.graphics import Color, Rectangle
-from kivy.lang import Builder
-from kivy.properties import (
-    BooleanProperty,
-    ListProperty,
-    ObjectProperty,
-    StringProperty,
-)
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.label import Label
+
 from kivy.uix.popup import Popup
-from kivy.uix.screenmanager import Screen, ScreenManager
+from kivy.uix.screenmanager import ScreenManager
 
 from re import A
 from typing import Dict, List
