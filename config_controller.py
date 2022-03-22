@@ -2,30 +2,23 @@
 # PeekingDuck GUI Controller for Node Config
 #
 
-from typing import Dict
+# from typing import Dict
 from pkdgui_widgets import NodeConfig
+from utils import get_node_type, NODE_RGBA_COLOR, BLACK, WHITE, NAVY
 
 # todo: avoid color definition duplication
-BLACK = (0, 0, 0, 1)
-WHITE = (1, 1, 1, 1)
-NAVY = (0, 0, 0.5, 1)
 NODE_CONFIG_RESERVED_KEYS = {"MODEL_NODES", "weights", "weights_parent_dir"}
 
 # Helper utils
-def get_node_type(node_title: str) -> str:
-    tokens = node_title.split(".")
-    node_type = tokens[1] if tokens[0] == "custom_nodes" else tokens[0]
-    return node_type
 
 
 class ConfigController:
-    def __init__(self, config_parser, node_rgba_color: Dict, pipeline_view) -> None:
+    def __init__(self, config_parser, pipeline_view) -> None:
         # todo: remove dependence on pipeline_view
         self.pipeline_view = pipeline_view
         self.config_header = pipeline_view.ids["pipeline_config_header"]
         self.pipeline_config = pipeline_view.ids["pipeline_config"]
         self.config_layout = self.pipeline_config.ids["config_layout"]
-        self.node_rgba_color = node_rgba_color
         self.config_parser = config_parser
 
     def clear_node_configs(self) -> None:
@@ -37,6 +30,8 @@ class ConfigController:
 
         Args:
             instance (Widget): the config instance to show onscreen
+
+        todo: if config is fully visible on-screen, don't scroll
         """
         self.pipeline_config.scroll_to(instance)
 
@@ -56,7 +51,7 @@ class ConfigController:
             node_config (_type_): configuration of node
         """
         node_type = get_node_type(node_title)
-        node_color = self.node_rgba_color[node_type]
+        node_color = NODE_RGBA_COLOR[node_type]
         # update node config view
         if node_type in ("input", "model"):
             self.set_node_config_header(node_title, color=node_color, font_color=BLACK)
