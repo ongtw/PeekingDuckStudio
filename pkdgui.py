@@ -51,7 +51,13 @@ from typing import Dict, List
 import os
 import yaml
 from config_parser import NodeConfigParser
-from pkdgui_widgets import Config, FileLoadDialog, Node, ScreenPipeline, ScreenPlayback
+from pkdgui_widgets import (
+    FileLoadDialog,
+    Node,
+    NodeConfig,
+    ScreenPipeline,
+    ScreenPlayback,
+)
 
 # Todo:
 # - add pipeline node
@@ -212,7 +218,7 @@ class pkdguiApp(App):
             if k not in NODE_CONFIG_RESERVED_KEYS:
                 tick = k in user_config_keys
                 if show_all or tick:
-                    config = Config(
+                    config = NodeConfig(
                         config_key=str(k),
                         config_value=str(v),
                         config_set=tick,
@@ -222,7 +228,7 @@ class pkdguiApp(App):
                     no_config = False
         if no_config:
             # add dummy widget showing "No Config" message
-            config = Config(
+            config = NodeConfig(
                 config_key="",
                 config_value="No user defined configurations",
                 config_set=False,

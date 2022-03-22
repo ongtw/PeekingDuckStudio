@@ -15,24 +15,6 @@ from kivy.uix.screenmanager import Screen
 from typing import List
 
 
-class Config(GridLayout):
-    bkgd_color = ListProperty([0, 0, 1, 1])
-    select_color = ListProperty([0, 0, 0, 0])
-    config_key = ObjectProperty("key")
-    config_value = ObjectProperty("value")
-    config_set = BooleanProperty(False)
-    callback_double_tap = ObjectProperty(None)
-
-    def on_touch_down(self, touch):
-        if touch.is_double_tap:
-            if self.collide_point(*touch.pos):
-                print(f"double-click: Config {self.config_key} {self.pos} {self.size}")
-                if self.callback_double_tap:
-                    self.callback_double_tap(self)
-                return True  # stop event from percolating
-        return super().on_touch_down(touch)
-
-
 class FileLoadDialog(FloatLayout):
     select = ObjectProperty(None)  # map to file/path selected method
     cancel = ObjectProperty(None)  # map to cancel method
@@ -56,6 +38,24 @@ class Node(GridLayout):
             if self.collide_point(*touch.pos):
                 print(f"Node {self.node_text}: double-click")
                 print(touch)
+                return True  # stop event from percolating
+        return super().on_touch_down(touch)
+
+
+class NodeConfig(GridLayout):
+    bkgd_color = ListProperty([0, 0, 1, 1])
+    select_color = ListProperty([0, 0, 0, 0])
+    config_key = ObjectProperty("key")
+    config_value = ObjectProperty("value")
+    config_set = BooleanProperty(False)
+    callback_double_tap = ObjectProperty(None)
+
+    def on_touch_down(self, touch):
+        if touch.is_double_tap:
+            if self.collide_point(*touch.pos):
+                print(f"double-click: Config {self.config_key} {self.pos} {self.size}")
+                if self.callback_double_tap:
+                    self.callback_double_tap(self)
                 return True  # stop event from percolating
         return super().on_touch_down(touch)
 
