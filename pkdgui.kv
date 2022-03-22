@@ -131,6 +131,7 @@
     padding: [dp(10), dp(10), dp(10), dp(10)]
     size_hint: (1, None)
     size: (0, dp(80))
+    callback_press: app.btn_node_press
     canvas.after:
         Color:
             rgba: root.select_color
@@ -150,7 +151,7 @@
         text_size: self.size
         text: root.node_text
         color: 0, 0, 0, 1
-        on_press: app.btn_node_press(self)
+        on_press: root.callback_press(self)
         background_normal: ""
         background_color: root.bkgd_color
 
@@ -161,6 +162,8 @@
     padding: [dp(10), dp(10), dp(10), dp(10)]
     size_hint: (1, None)
     size: (0, dp(80))
+    callback_press: app.btn_config_press
+    # callback_release: app.btn_release
     # to highlight if node is selected
     canvas.after:
         Color:
@@ -217,7 +220,8 @@
         valign: "middle"
         text_size: self.size
         text: root.config_value
-        on_press: app.btn_config_press(self)
+        on_press: root.callback_press(self)
+
 
 
 #

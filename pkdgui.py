@@ -86,6 +86,16 @@ class Config(GridLayout):
     config_key = ObjectProperty("key")
     config_value = ObjectProperty("value")
     config_set = BooleanProperty(False)
+    callback_double_tap = ObjectProperty(None)
+
+    def on_touch_down(self, touch):
+        if touch.is_double_tap:
+            if self.collide_point(*touch.pos):
+                print(f"double-click: Config {self.config_key} {self.pos} {self.size}")
+                if self.callback_double_tap:
+                    self.callback_double_tap(self)
+                return True  # stop event from percolating
+        return super().on_touch_down(touch)
 
 
 class FileLoadDialog(FloatLayout):
@@ -104,6 +114,14 @@ class Node(GridLayout):
     select_color = ListProperty([0, 0, 0, 0])
     node_number = ObjectProperty("0")
     node_text = ObjectProperty("")
+
+    def on_touch_down(self, touch):
+        if touch.is_double_tap:
+            if self.collide_point(*touch.pos):
+                print(f"Node {self.node_text}: double-click")
+                print(touch)
+                return True  # stop event from percolating
+        return super().on_touch_down(touch)
 
 
 class Output(GridLayout):
@@ -162,8 +180,8 @@ class pkdguiApp(App):
         self.screen_playback = ScreenPlayback(name="screen_playback")
         sm.add_widget(self.screen_playback)
         self.sm = sm
-        Window.left = 100
-        Window.top = 100
+        # Window.left = 100
+        # Window.top = 100
 
         self.play = "stop"
         self.selected_node = None
@@ -178,10 +196,31 @@ class pkdguiApp(App):
         self.idx_to_node = None
         self.node_to_idx = None
 
+        self._keyboard = Window.request_keyboard(
+            self.keyboard_closed, self.screen_pipeline
+        )
+        self._keyboard.bind(on_key_down=self.on_keyboard_down)
+
         return sm
 
+    def to_window(self, x, y, initial=True, relative=False):
+        return x, y
+
+    def keyboard_closed(self) -> None:
+        self._keyboard.unbind(on_key_down=self.on_keyboard_down)
+        self._keyboard = None
+
+    def on_keyboard_down(self, keyboard, keycode, text, modifiers) -> bool:
+        print(f"Keycode: {keycode} pressed, text={text}, modifiers={modifiers}")
+        # if keycode[1] == "escape":
+        #     keyboard.release()  # stop accepting key inputs
+        if keycode[1] == "escape":
+            self.clear_selected_configs()
+            self.clear_selected_nodes()
+        return True  # to accept key, else will be used by system
+
     # App GUI Widget Access
-    def setup_output(self):
+    def setup_output(self) -> None:
         screen = self.screen_playback
         pkd_view = screen.ids["pkd_view"]
         self.output_header = pkd_view.ids["pkd_header"]
@@ -189,7 +228,7 @@ class pkdguiApp(App):
         self.pkd_output = pkd_output
         # pkd_output.touch_down_callback = self.on_touch_down
 
-    def setup_key_widgets(self):
+    def setup_key_widgets(self) -> None:
         screen = self.screen_pipeline
         self.project_info = screen.ids["project_info"]
         self.pipeline_view = screen.ids["pipeline_view"]
@@ -261,7 +300,10 @@ class pkdguiApp(App):
                 tick = k in user_config_keys
                 if show_all or tick:
                     config = Config(
-                        config_key=str(k), config_value=str(v), config_set=tick
+                        config_key=str(k),
+                        config_value=str(v),
+                        config_set=tick,
+                        callback_double_tap=self.scroll_to_config,
                     )
                     config_layout.add_widget(config)
                     no_config = False
@@ -271,9 +313,18 @@ class pkdguiApp(App):
                 config_key="",
                 config_value="No user defined configurations",
                 config_set=False,
+                callback_double_tap=None,
             )
             config_layout.add_widget(config)
         self.pipeline_config.scroll_y = 1.0  # move scrollview to top
+
+    def scroll_to_config(self, instance, *args) -> None:
+        """Move scrollview so that config instance is fully visible
+
+        Args:
+            instance (Widget): the config instance to show onscreen
+        """
+        self.pipeline_config.scroll_to(instance)
 
     def clear_node_configs(self) -> None:
         self.config_layout.clear_widgets()
@@ -288,6 +339,7 @@ class pkdguiApp(App):
         for node in self.all_selected_nodes:
             node.select_color = NODE_COLOR_CLEAR
         self.all_selected_nodes.clear()
+        self.selected_node = None
         self.clear_node_configs()
 
     # App GUI Event Callbacks
@@ -511,8 +563,8 @@ class pkdguiApp(App):
         loaded_pipeline_nodes = self.pipeline["nodes"]
         # set header
         num_nodes = len(loaded_pipeline_nodes)
-        toks = self.pipeline_file_path.split("/")
-        self.filename = toks[-1]
+        tokens = self.pipeline_file_path.split("/")
+        self.filename = tokens[-1]
         self.setup_node_map(num_nodes)
 
         # decode nodes
