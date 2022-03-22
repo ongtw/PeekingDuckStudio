@@ -276,7 +276,7 @@
         callback_press: app.btn_save_file
     RoundedButton:
         text: "Run"
-        callback_press: app.goto_screen_playback
+        callback_press: app.btn_goto_screen_playback
     RoundedButton:
         text: "Quit"
         callback_press: app.btn_quit
@@ -333,7 +333,7 @@
                     text:
                         "" if root.config_state == "" else TRIANGLE_DOWN \
                         if root.config_state == "expand" else TRIANGLE_RIGHT
-                    callback_release: app.toggle_config_state
+                    callback_release: app.btn_toggle_config_state
                     tag: "expand"
             Header:
                 id: pipeline_config_header
@@ -465,7 +465,7 @@
     RoundedButton:
         tag: "rewind"
         text: LINE_VERTICAL + TRIANGLE_LEFT
-        callback_press: app.goto_screen_pipeline
+        callback_press: app.btn_goto_screen_pipeline
     RoundedButton:
         tag: "backward"
         text: TRIANGLE_LEFT + TRIANGLE_LEFT

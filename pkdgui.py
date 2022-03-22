@@ -10,6 +10,7 @@ DIR_FILTERS = [""]
 FILE_FILTERS = ["*.yml"]
 WIN_WIDTH = 1280
 WIN_HEIGHT = 800
+# todo: avoid color definition duplication
 BLACK = (0, 0, 0, 1)
 WHITE = (1, 1, 1, 1)
 NAVY = (0, 0, 0.5, 1)
@@ -26,7 +27,6 @@ NODE_COLOR_SELECTED = (0, 0, 1, 0.5)
 NODE_COLOR_CLEAR = (0, 0, 1, 0)
 CONFIG_COLOR_SELECTED = (0.5, 0.5, 0.5, 0.5)
 CONFIG_COLOR_CLEAR = (0.5, 0.5, 0.5, 0)
-NODE_CONFIG_RESERVED_KEYS = {"MODEL_NODES", "weights", "weights_parent_dir"}
 BUTTON_DELAY = 0.2
 
 # Imports
@@ -50,14 +50,14 @@ from re import A
 from typing import Dict, List
 import os
 import yaml
-from config_parser import NodeConfigParser
 from pkdgui_widgets import (
     FileLoadDialog,
     Node,
-    NodeConfig,
     ScreenPipeline,
     ScreenPlayback,
 )
+from config_parser import NodeConfigParser
+from config_controller import ConfigController, get_node_type
 
 # Todo:
 # - add pipeline node
@@ -74,12 +74,6 @@ from pkdgui_widgets import (
 ###
 # Little utils
 ###
-def get_node_type(node_title: str) -> str:
-    toks = node_title.split(".")
-    node_type = toks[1] if toks[0] == "custom_nodes" else toks[0]
-    return node_type
-
-
 def get_node_color(node_title: str):
     node_type = get_node_type(node_title)
     node_color = NODE_RGBA_COLOR[node_type]
@@ -111,6 +105,10 @@ class pkdguiApp(App):
         self.setup_gui_working_vars()
 
         self.config_parser = NodeConfigParser()
+        self.config_controller = ConfigController(
+            self.config_parser, NODE_RGBA_COLOR, self.pipeline_view
+        )
+
         self.num_nodes = 0
         self.idx_to_node = None
         self.node_to_idx = None
@@ -151,13 +149,7 @@ class pkdguiApp(App):
         screen = self.screen_pipeline
         self.project_info = screen.ids["project_info"]
         self.pipeline_view = screen.ids["pipeline_view"]
-        pipeline_header = self.pipeline_view.ids["pipeline_header"]
-        self.pipeline_header = pipeline_header
-        pipeline_config_header = self.pipeline_view.ids["pipeline_config_header"]
-        self.pipeline_config_header = pipeline_config_header
-        pipeline_config = self.pipeline_view.ids["pipeline_config"]
-        self.pipeline_config = pipeline_config
-        self.config_layout = pipeline_config.ids["config_layout"]
+        self.pipeline_header = self.pipeline_view.ids["pipeline_header"]
         pipeline_nodes_view = self.pipeline_view.ids["pipeline_nodes"]
         self.pipeline_nodes_view = pipeline_nodes_view
         self.nodes_layout = pipeline_nodes_view.ids["pipeline_layout"]
@@ -171,95 +163,23 @@ class pkdguiApp(App):
     def set_pipeline_header(self, text: str) -> None:
         self.pipeline_header.header_text = text
 
-    def set_node_config_header(self, text: str, color=None, font_color=None) -> None:
-        header = self.pipeline_config_header
-        header.header_text = text
-        if color:
-            header.header_color = color
-        if font_color:
-            header.font_color = font_color
-
     def set_output_header(self, text: str) -> None:
         self.output_header.header_text = text
 
-    def show_node_configs(self) -> None:
-        """Shows configuration for given node
-
-        Args:
-            node_title (str): name of node, e.g. `input.visual`
-            node_config (_type_): configuration of node
-        """
-        if self.selected_node is None:
-            return
-        node_title = self.selected_node.button.text
-        node_type = get_node_type(node_title)
-        node_color = NODE_RGBA_COLOR[node_type]
-        # update node config view
-        if node_type in ("input", "model"):
-            self.set_node_config_header(node_title, color=node_color, font_color=BLACK)
-        else:
-            self.set_node_config_header(node_title, color=node_color, font_color=WHITE)
-        node_config = self.pipeline_nodes_to_configs[node_title]
-
-        config_layout = self.config_layout
-        config_layout.clear_widgets()
-        default_config = self.config_parser.title_config_map[node_title].copy()
-        # replace default with user config
-        user_config_keys = set()
-        for config in node_config:
-            for k, v in config.items():
-                if k in default_config:
-                    user_config_keys.add(k)
-                    default_config[k] = v
-        # show default config with user overrides
-        show_all: bool = self.pipeline_view.config_state == "expand"
-        no_config: bool = True
-        for k, v in default_config.items():
-            if k not in NODE_CONFIG_RESERVED_KEYS:
-                tick = k in user_config_keys
-                if show_all or tick:
-                    config = NodeConfig(
-                        config_key=str(k),
-                        config_value=str(v),
-                        config_set=tick,
-                        callback_double_tap=self.scroll_to_config,
-                    )
-                    config_layout.add_widget(config)
-                    no_config = False
-        if no_config:
-            # add dummy widget showing "No Config" message
-            config = NodeConfig(
-                config_key="",
-                config_value="No user defined configurations",
-                config_set=False,
-                callback_double_tap=None,
-            )
-            config_layout.add_widget(config)
-        self.pipeline_config.scroll_y = 1.0  # move scrollview to top
-
-    def scroll_to_config(self, instance, *args) -> None:
-        """Move scrollview so that config instance is fully visible
-
-        Args:
-            instance (Widget): the config instance to show onscreen
-        """
-        self.pipeline_config.scroll_to(instance)
-
-    def clear_node_configs(self) -> None:
-        self.config_layout.clear_widgets()
-        self.set_node_config_header("Node Config", color=NAVY, font_color=WHITE)
-
+    # Misc
     def clear_selected_configs(self) -> None:
+        """Unselect currently selected node config"""
         for config in self.all_selected_configs:
             config.select_color = CONFIG_COLOR_CLEAR
         self.all_selected_configs.clear()
 
     def clear_selected_nodes(self) -> None:
+        """Unselect currently selected pipeline node"""
         for node in self.all_selected_nodes:
             node.select_color = NODE_COLOR_CLEAR
         self.all_selected_nodes.clear()
         self.selected_node = None
-        self.clear_node_configs()
+        self.config_controller.clear_node_configs()
 
     # App GUI Event Callbacks
     # Buttons: generic dummy callbacks
@@ -271,17 +191,26 @@ class pkdguiApp(App):
         parent = btn.parent
         print(f"btn_release: {btn.text} tag={parent.tag}")
 
+    # Buttons: Specific
     # Screen transitions
-    def goto_screen_pipeline(self, *args) -> None:
+    def btn_goto_screen_pipeline(self, *args) -> None:
         self.sm.transition.direction = "right"
         self.sm.current = "screen_pipeline"
 
-    def goto_screen_playback(self, *args) -> None:
+    def btn_goto_screen_playback(self, *args) -> None:
         self.sm.transition.direction = "left"
         self.sm.current = "screen_playback"
 
-    # Buttons: Specific
-    def toggle_config_state(self, *args) -> None:
+    def show_node_configs(self) -> None:
+        """Interface to Config Controller"""
+        if self.selected_node is None:
+            return
+        node = self.selected_node
+        node_title = node.button.text
+        node_config = self.pipeline_nodes_to_configs[node_title]
+        self.config_controller.show_node_configs(node_title, node_config)
+
+    def btn_toggle_config_state(self, *args) -> None:
         """Toggle show all or only user-defined configurations"""
         if self.pipeline_view.config_state == "expand":
             self.pipeline_view.config_state = "contract"

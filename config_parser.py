@@ -1,3 +1,4 @@
+from typing import List
 import peekingduck
 import yaml
 from pathlib import Path
@@ -51,7 +52,7 @@ class NodeConfigParser:
             self.nodes_by_type[node_type] = nodelist
             self.nodes_list.extend(nodelist)
 
-    def verify_config(self, idx_to_node):
+    def verify_config(self, idx_to_node) -> List:
         pipeline_errors = []
 
         if idx_to_node:
