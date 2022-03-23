@@ -14,3 +14,4 @@ __pycache__/
 
 # my stuff
 z_files/
+z_*/
