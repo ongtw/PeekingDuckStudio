@@ -3,8 +3,8 @@
 #
 
 # from typing import Dict
-from pkdgui_widgets import NodeConfig
-from utils import get_node_type, NODE_RGBA_COLOR, BLACK, WHITE, NAVY
+from gui_widgets import NodeConfig
+from gui_utils import get_node_type, NODE_RGBA_COLOR, BLACK, WHITE, NAVY
 
 # todo: avoid color definition duplication
 NODE_CONFIG_RESERVED_KEYS = {"MODEL_NODES", "weights", "weights_parent_dir"}

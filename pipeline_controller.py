@@ -3,8 +3,8 @@
 #
 
 import yaml
-from pkdgui_widgets import Node
-from utils import get_node_color
+from gui_widgets import Node
+from gui_utils import get_node_color
 
 
 class PipelineController:

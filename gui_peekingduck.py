@@ -36,7 +36,7 @@ from kivy.uix.screenmanager import ScreenManager
 import os
 from re import A
 from typing import Dict, List
-from pkdgui_widgets import (
+from gui_widgets import (
     FileLoadDialog,
     ScreenPipeline,
     ScreenPlayback,
@@ -57,7 +57,7 @@ from pipeline_controller import PipelineController
 # - PKD playback
 
 
-class pkdguiApp(App):
+class PeekingDuckGuiApp(App):
     def build(self):
         """
         Main Kivy application entry point
@@ -303,4 +303,4 @@ class pkdguiApp(App):
 
 
 if __name__ == "__main__":
-    pkdguiApp().run()
+    PeekingDuckGuiApp().run()
