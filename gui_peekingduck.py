@@ -70,7 +70,7 @@ class PeekingDuckGuiApp(App):
         self.screen_playback = ScreenPlayback(name="screen_playback")
         sm.add_widget(self.screen_playback)
         self.sm = sm
-        # Window.left = 100
+        Window.left = 100
         # Window.top = 100
 
         self.play = "stop"

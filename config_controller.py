@@ -25,7 +25,7 @@ class ConfigController:
         self.config_layout.clear_widgets()
         self.set_node_config_header("Node Config", color=NAVY, font_color=WHITE)
 
-    def scroll_to_config(self, instance, *args) -> None:
+    def config_double_tap(self, instance, *args) -> None:
         """Move scrollview so that config instance is fully visible
 
         Args:
@@ -33,7 +33,23 @@ class ConfigController:
 
         todo: if config is fully visible on-screen, don't scroll
         """
-        self.pipeline_config.scroll_to(instance)
+        print(f"double-tap instance {type(instance)}")
+        print(f"  pos={instance.pos} size={instance.size}")
+        parent = self.config_layout.parent
+        # print(
+        #     f"config_layout: pos={self.config_layout.pos} size={self.config_layout.size}"
+        # )
+        # print(f"parent: {type(parent)}")
+        # print(f"  pos={parent.pos} size={parent.size}")
+
+        # don't scroll if boxlayout.height < scrollview.height
+        # 'coz nodes will flush towards bottom of scrollview and look weird
+        if self.config_layout.height > parent.height:
+            self.pipeline_config.scroll_to(instance)
+        overlay = instance.the_overlay
+        key = instance.config_key
+        val = instance.config_value
+        print(f"key: {key}, val: {val}, overlay: {overlay.pos} {overlay.size}")
 
     def set_node_config_header(self, text: str, color=None, font_color=None) -> None:
         header = self.config_header
@@ -79,7 +95,7 @@ class ConfigController:
                         config_key=str(k),
                         config_value=str(v),
                         config_set=tick,
-                        callback_double_tap=self.scroll_to_config,
+                        callback_double_tap=self.config_double_tap,
                     )
                     config_layout.add_widget(config)
                     no_config = False

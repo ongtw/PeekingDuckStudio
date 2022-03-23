@@ -36,7 +36,7 @@ class Node(GridLayout):
     def on_touch_down(self, touch):
         if touch.is_double_tap:
             if self.collide_point(*touch.pos):
-                print(f"Node {self.node_text}: double-click")
+                print(f"Node.on_touch_down: double-tap {self.node_text}")
                 print(touch)
                 return True  # stop event from percolating
         return super().on_touch_down(touch)
@@ -53,7 +53,7 @@ class NodeConfig(GridLayout):
     def on_touch_down(self, touch):
         if touch.is_double_tap:
             if self.collide_point(*touch.pos):
-                print(f"double-click: Config {self.config_key} {self.pos} {self.size}")
+                print(f"NodeConfig.on_touch_down: double-tap {self.config_key}")
                 if self.callback_double_tap:
                     self.callback_double_tap(self)
                 return True  # stop event from percolating

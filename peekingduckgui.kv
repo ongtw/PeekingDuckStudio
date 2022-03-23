@@ -165,6 +165,8 @@
     callback_press: app.btn_config_press
     # callback_release: app.btn_release
     # to highlight if node is selected
+    the_button: id_btn_config
+    the_overlay: id_overlay
     canvas.after:
         Color:
             rgba: root.select_color
@@ -215,13 +217,22 @@
     Separator:
         line_color: BLACK
         width: dp(5)
-    Button:
-        halign: "center"
-        valign: "middle"
-        text_size: self.size
-        text: root.config_value
-        on_press: root.callback_press(self)
-
+    FloatLayout:
+        Button:
+            id: id_btn_config
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            size_hint: (1, 1)
+            halign: "center"
+            valign: "middle"
+            text_size: self.size
+            text: root.config_value
+            on_press: root.callback_press(self)
+            overlay: root.the_overlay
+        BoxLayout:
+            id: id_overlay
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            size_hint: (1, 1)
+            tag: "the_overlay"
 
 
 #
