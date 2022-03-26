@@ -30,7 +30,7 @@ class FileLoadDialog(FloatLayout):
 class Node(GridLayout):
     bkgd_color = ListProperty([0, 0, 1, 1])
     select_color = ListProperty([0, 0, 0, 0])
-    node_number = ObjectProperty("0")
+    node_number = ObjectProperty("0")  # shown as index in GUI
     node_text = ObjectProperty("")
 
     def on_touch_down(self, touch):

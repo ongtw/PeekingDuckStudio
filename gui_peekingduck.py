@@ -44,6 +44,7 @@ from gui_widgets import (
 from config_parser import NodeConfigParser
 from config_controller import ConfigController
 from pipeline_controller import PipelineController
+from pipeline_model import PipelineModel
 
 # Todo:
 # - add pipeline node
@@ -51,6 +52,9 @@ from pipeline_controller import PipelineController
 # - configure pipeline node
 # - save pipeline
 # - show pipeline errors
+# - anomalous pipelines:
+#   * duplicate nodes
+#   * multiple nodes of same type (any allowed combo?)
 # - undo/redo
 # - support custom nodes definition
 # - app config: default folder, etc.
@@ -88,15 +92,19 @@ class PeekingDuckGuiApp(App):
         self.pipeline_controller = PipelineController(
             self.config_parser, self.pipeline_view
         )
+        self.pipeline_model = None
 
-        self._keyboard = Window.request_keyboard(
-            self.keyboard_closed, self.screen_pipeline
-        )
-        self._keyboard.bind(on_key_down=self.on_keyboard_down)
+        # disable 'coz interferes with TextInput overlay
+        # self._keyboard = Window.request_keyboard(
+        #     self.keyboard_closed, self.screen_pipeline
+        # )
+        # self._keyboard.bind(on_key_down=self.on_keyboard_down)
 
         return sm
 
+    # Keyboard events
     def to_window(self, x, y, initial=True, relative=False):
+        # Need this for keyboard events to work properly (quick hack?)
         return x, y
 
     def keyboard_closed(self) -> None:
@@ -107,10 +115,11 @@ class PeekingDuckGuiApp(App):
         print(f"Keycode: {keycode} pressed, text={text}, modifiers={modifiers}")
         # if keycode[1] == "escape":
         #     keyboard.release()  # stop accepting key inputs
-        if keycode[1] == "escape":
-            self.clear_selected_configs()
-            self.clear_selected_nodes()
-        return True  # to accept key, else will be used by system
+        # if keycode[1] == "escape":
+        #     self.clear_selected_configs()
+        #     self.clear_selected_nodes()
+        #     return True  # to accept key, else will be used by system
+        return False
 
     # App GUI Widget Access
     def setup_output(self) -> None:
@@ -257,16 +266,18 @@ class PeekingDuckGuiApp(App):
             path (str): Path containing the pipeline configuration yaml file
             file_paths (List[str]): Selected yaml file(s)
         """
-        print(f"path={path}, file_paths={file_paths}")
         self._file_dialog.dismiss()
+        print(f"path={path}, file_paths={file_paths}")
         the_path = file_paths[0]  # only want first file
-        self.pipeline_controller.load_file(the_path)
         # decode project info
         tokens = the_path.split("/")
         self.filename = tokens[-1]
         self.set_output_header(self.filename)
         self.project_info.directory = os.path.dirname(the_path)
         self.project_info.filename = self.filename
+        self.pipeline_model = PipelineModel(the_path)
+        self.pipeline_controller.set_pipeline_model(self.pipeline_model)
+        self.pipeline_controller.draw_nodes()
 
     #####################
     # Pipeline processing

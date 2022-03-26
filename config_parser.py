@@ -13,57 +13,60 @@ class NodeConfigParser:
     def __init__(self) -> None:
         self.pkd_path = get_peekingduck_path()
         self.config_path = self.pkd_path / "configs"
-        self.find_config_files()
-        self.parse_pkd_configs()
+        self.find_config_dirs()
+        self.parse_default_configs()
 
-    def find_config_files(self):
+    def find_config_dirs(self):
+        """Get directories containing PeekingDuck configs"""
         files = self.config_path.glob("*")
-        self.configs = sorted([file for file in files if file.is_dir()])
-        # print("configs:", self.configs)
+        self.config_dirs = sorted([file for file in files if file.is_dir()])
+        print("config_dirs:", self.config_dirs)
 
-    def parse_pkd_configs(self):
+    def get_default_configs(self, node_title: str):
+        return self.node_config_map[node_title]
+
+    def get_default_value(self, node_title: str, config_key: str):
+        default_config = self.node_config_map[node_title]
+        default_val = default_config[config_key]
+        return default_val
+
+    def parse_default_configs(self):
         """Parse PeekingDuck node default configuration"""
-        self.nodes_list = []
-        self.nodes_by_type = dict()
-        self.title_config_map = dict()
-        self.pkd_config = dict()
+        self.nodes_by_type = dict()  # map node type -> list of nodes
+        self.node_config_map = dict()  # map node title -> node config
 
-        for config in self.configs:
+        for config in self.config_dirs:
             node_type = config.name
-            print(node_type)
-            nodelist = []
-
-            name_config_map = dict()
+            print(f"parsing node_type={node_type}")
             files = sorted(config.glob("*.yml"))
+            # working data structures
+            node_list = []
 
             for config_file in files:
                 node_name = config_file.name[:-4]
+                node_title = f"{node_type}.{node_name}"
                 print("  ", node_name)
                 with open(config_file) as file:
                     node_config = yaml.safe_load(file)
-                # print(node_config)
-                name_config_map[node_name] = node_config
-                node_title = f"{node_type}.{node_name}"
+                print(f"--{node_title} config:{type(node_config)}--")
+                print(node_config)
 
-                self.title_config_map[node_title] = node_config
-                nodelist.append(node_title)
+                self.node_config_map[node_title] = node_config
+                node_list.append(node_title)
 
-            self.pkd_config[node_type] = name_config_map
-            self.nodes_by_type[node_type] = nodelist
-            self.nodes_list.extend(nodelist)
+            self.nodes_by_type[node_type] = node_list
 
-    def verify_config(self, idx_to_node) -> List:
+    def verify_config(self, idx_to_node: List[str]) -> List:
         pipeline_errors = []
 
         if idx_to_node:
             data_types_available = set()
-            for i, nodeWidget in enumerate(idx_to_node):
-                node_title = nodeWidget.node_text
+            for i, node_title in enumerate(idx_to_node):
                 print(f"verifying {node_title}...")
                 if node_title.startswith("custom_nodes."):
                     print("skipping custom node")
-                    continue
-                node_config = self.title_config_map[node_title]
+                    continue  # ignore custom nodes for now... todo
+                node_config = self.node_config_map[node_title]
                 node_input = node_config["input"]
                 node_output = node_config["output"]
                 # check input
@@ -84,23 +87,22 @@ class NodeConfigParser:
         return pipeline_errors
 
     def debug_configs(self):
-        for node_type in self.pkd_config:
-            print(f"{node_type}")
+        for node_type, node_list in self.nodes_by_type.items():
+            print(f"node_type={node_type}")
 
-            nodes_map = self.pkd_config[node_type]
-            for node_name in nodes_map:
-                print(f"{node_type}.{node_name}")
-
-                node_config = nodes_map[node_name]
+            for node_title in node_list:
+                node_name = node_title.split(".")[1]
+                node_config = self.node_config_map[node_title]
+                print(f"node_title={node_title}, node_name={node_name}")
                 print(node_config)
 
 
 def main():
     config_parser = NodeConfigParser()
     # config_parser.debug_configs()
-    print(config_parser.nodes_list)
-    print(config_parser.nodes_by_type)
-    print(config_parser.title_config_map)
+    # print(config_parser.nodes_list)
+    # print(config_parser.nodes_by_type)
+    # print(config_parser.node_config_map)
 
 
 if __name__ == "__main__":
