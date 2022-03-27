@@ -61,11 +61,11 @@ class NodeConfig(GridLayout):
 
 
 class Output(GridLayout):
-    def on_touch_down(self, touch):
-        # if self.collide_point(*touch.pos):
-        #     print("Output: touch inside me")
-        # self.touch_down_callback(touch)
-        pass
+    pass
+    # def on_touch_down(self, touch):
+    # if self.collide_point(*touch.pos):
+    #     print("Output: touch inside me")
+    # self.touch_down_callback(touch)
 
 
 class ProjectInfo(GridLayout):

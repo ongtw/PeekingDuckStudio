@@ -297,7 +297,7 @@
 # Pipline Editor View
 #
 <PipelineView@BoxLayout>:
-    config_state: "contract"
+    config_state: "expand"
     BoxLayout:
         orientation: "vertical"
         size_hint_x: 0.4
@@ -459,40 +459,60 @@
 <Output>:
     cols: 1
     rows: 1
-    Label:
-        text: "Output"
+    Image:
+        id: image
+    # Label:
+    #     text: "Output"
 
 <PeekingDuckControls@BoxLayout>:
     padding: 6
     spacing: 10
     RoundedButton:
-        tag: "play/stop"
-        text: TRIANGLE_RIGHT
+        tag: "go_back"
+        text: ARROW_LEFT
         text_size: sp(20)
-        callback_press: app.btn_verify_pipeline
+        callback_press: app.btn_goto_screen_pipeline
+    Separator:
+        line_color: GUI_COLOR
+    RoundedButton:
+        id: btn_play_stop
+        tag: "play"
+        text: TRIANGLE_RIGHT if self.tag == "play" else SQUARE
+        text_size: sp(20)
+        callback_press: app.btn_play_stop_press
     RoundedButton:
         tag: "pause"
         text: "||"
     RoundedButton:
-        tag: "rewind"
+        tag: "first_frame"
         text: LINE_VERTICAL + TRIANGLE_LEFT
-        callback_press: app.btn_goto_screen_pipeline
+        callback_press: app.btn_first_frame
     RoundedButton:
         tag: "backward"
         text: TRIANGLE_LEFT + TRIANGLE_LEFT
+        callback_press: app.btn_backward_press
+        callback_release: app.btn_backward_release
     RoundedButton:
         tag: "forward"
         text: TRIANGLE_RIGHT + TRIANGLE_RIGHT
+        callback_press: app.btn_forward_press
+        callback_release: app.btn_forward_release
+    RoundedButton:
+        tag: "last_frame"
+        text: TRIANGLE_RIGHT + LINE_VERTICAL
+        callback_press: app.btn_last_frame
     Separator:
         line_color: GUI_COLOR
     RoundedButton:
         tag: "zoom_out"
         text: "A"
         text_size: sp(10)
+        callback_press: app.btn_zoom_out
     RoundedButton:
         tag: "zoom_in"
         text: "A"
         text_size: sp(20)
+        callback_press: app.btn_zoom_in
 
 <PeekingDuckView@BoxLayout>:
     orientation: "vertical"

@@ -15,6 +15,7 @@ NODE_COLOR_CLEAR = (0, 0, 1, 0)
 CONFIG_COLOR_SELECTED = (0.5, 0.5, 0.5, 0.5)
 CONFIG_COLOR_CLEAR = (0.5, 0.5, 0.5, 0)
 BUTTON_DELAY = 0.2
+PLAYBACK_DELAY = 0.01
 
 # Imports
 from kivy.config import Config
@@ -43,6 +44,7 @@ from gui_widgets import (
 )
 from config_parser import NodeConfigParser
 from config_controller import ConfigController
+from output_controller import OutputController
 from pipeline_controller import PipelineController
 from pipeline_model import PipelineModel
 
@@ -89,6 +91,7 @@ class PeekingDuckGuiApp(App):
         self.config_controller = ConfigController(
             self.config_parser, self.pipeline_view
         )
+        self.output_controller = OutputController(self.output_image)
         self.pipeline_controller = PipelineController(
             self.config_parser, self.pipeline_view
         )
@@ -126,9 +129,11 @@ class PeekingDuckGuiApp(App):
         screen = self.screen_playback
         pkd_view = screen.ids["pkd_view"]
         self.output_header = pkd_view.ids["pkd_header"]
-        pkd_output = pkd_view.ids["pkd_output"]
-        self.pkd_output = pkd_output
+        self.output_container = pkd_view.ids["pkd_output"]
+        self.output_image = self.output_container.ids["image"]
         # pkd_output.touch_down_callback = self.on_touch_down
+        pkd_controls = pkd_view.ids["pkd_controls"]
+        self.rounded_button_play_stop = pkd_controls.ids["btn_play_stop"]
 
     def setup_key_widgets(self) -> None:
         screen = self.screen_pipeline
@@ -185,8 +190,9 @@ class PeekingDuckGuiApp(App):
             return
         node = self.selected_node
         node_title = node.button.text
-        node_config = self.pipeline_controller.get_node_config(node_title)
-        self.config_controller.show_node_configs(node_title, node_config)
+        # node_config = self.pipeline_controller.get_node_config(node_title)
+        # self.config_controller.show_node_configs(node_title, node_config)
+        self.config_controller.show_node_configs(node_title)
 
     def btn_toggle_config_state(self, *args) -> None:
         """Toggle show all or only user-defined configurations"""
@@ -238,23 +244,87 @@ class PeekingDuckGuiApp(App):
         self._file_dialog.dismiss()
 
     # Playback controls
-    def btn_play_stop(self) -> None:
-        print("btn_play_stop")
+    def btn_play_stop_press(self, btn, *args) -> None:
+        tag = btn.parent.tag
+        print(f"btn_play_stop_press: tag={tag}")
+        if self.pipeline_model is None:
+            return
+        if tag == "play":
+            self.set_play_stop_btn_to_stop()
+            if self.pipeline_model.dirty:
+                # play modified pipeline
+                if hasattr(self.pipeline_model, "node_list"):
+                    pipeline_str = self.config_parser.get_string_representation(
+                        self.pipeline_model.node_list, self.pipeline_model.node_config
+                    )
+                    # print(f"nodes={pipeline_str}")
+                    self.output_controller.run_pipeline_start(pipeline_str)
+                    self.pipeline_model.clear_dirty_bit()
+            else:
+                # play last unchanged pipeline
+                self.btn_forward_press(args)
+        else:
+            self.set_play_stop_btn_to_play()
+            if self.output_controller.pipeline_running:
+                self.output_controller.stop_running_pipeline()
+            else:
+                if hasattr(self, "btn_forward_held"):
+                    self.btn_forward_release(args)
 
-        # Touch events
-        # def on_touch_down(self, touch):
-        """This method is passed as a callback to widgets to get them to reroute
-        their touch_down event back here.
+    def set_play_stop_btn_to_play(self) -> None:
+        self.rounded_button_play_stop.tag = "play"
 
-        Args:
-            touch (_type_): the touch event
-        """
-        # print(f"app touch: {touch.x}, {touch.y}")
-        # if self.pkd_output.collide_point(*touch.pos):
-        #     self.clear_selected_configs()
-        #     self.clear_selected_nodes()
-        # else:
-        #     pass
+    def set_play_stop_btn_to_stop(self) -> None:
+        self.rounded_button_play_stop.tag = "stop"
+
+    def btn_forward_press(self, *args) -> None:
+        if self.output_controller.forward_one_frame():
+            self.btn_forward_held = Clock.schedule_once(
+                self.btn_forward_press, PLAYBACK_DELAY
+            )
+        else:
+            self.set_play_stop_btn_to_play()
+
+    def btn_forward_release(self, *args) -> None:
+        if self.btn_forward_held:
+            self.btn_forward_held.cancel()
+
+    def btn_backward_press(self, *args) -> None:
+        if self.output_controller.backward_one_frame():
+            self.btn_backward_held = Clock.schedule_once(
+                self.btn_backward_press, PLAYBACK_DELAY
+            )
+
+    def btn_backward_release(self, *args) -> None:
+        if self.btn_backward_held:
+            self.btn_backward_held.cancel()
+
+    def btn_first_frame(self, *args) -> None:
+        self.output_controller.goto_first_frame()
+
+    def btn_last_frame(self, *args) -> None:
+        self.output_controller.goto_last_frame()
+
+    def btn_zoom_in(self, *args) -> None:
+        self.output_controller.zoom_in()
+
+    def btn_zoom_out(self, *args) -> None:
+        self.output_controller.zoom_out()
+
+    # Touch events
+    # def on_touch_down(self, touch):
+    """This method is passed as a callback to widgets to get them to reroute
+    their touch_down event back here.
+
+    Args:
+        touch (_type_): the touch event
+    """
+    # print(f"app touch: {touch.x}, {touch.y}")
+    # if self.pkd_output.collide_point(*touch.pos):
+    #     self.clear_selected_configs()
+    #     self.clear_selected_nodes()
+    # else:
+    #     pass
 
     #####################
     # File operations
@@ -276,6 +346,7 @@ class PeekingDuckGuiApp(App):
         self.project_info.directory = os.path.dirname(the_path)
         self.project_info.filename = self.filename
         self.pipeline_model = PipelineModel(the_path)
+        self.config_controller.set_pipeline_model(self.pipeline_model)
         self.pipeline_controller.set_pipeline_model(self.pipeline_model)
         self.pipeline_controller.draw_nodes()
 

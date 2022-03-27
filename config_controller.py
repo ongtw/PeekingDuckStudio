@@ -6,6 +6,7 @@ from typing import List
 from gui_widgets import NodeConfig
 from gui_utils import get_node_type, NODE_RGBA_COLOR, BLACK, WHITE, NAVY
 from config_parser import NodeConfigParser
+from pipeline_model import PipelineModel
 from kivy.clock import Clock
 from kivy.uix.textinput import TextInput
 import ast
@@ -22,6 +23,9 @@ class ConfigController:
         self.config_layout = self.pipeline_config.ids["config_layout"]
         self.config_parser: NodeConfigParser = config_parser
         self.overlay = None
+
+    def set_pipeline_model(self, pipeline_model) -> None:
+        self.pipeline_model: PipelineModel = pipeline_model
 
     def clear_node_configs(self) -> None:
         self.config_layout.clear_widgets()
@@ -107,7 +111,7 @@ class ConfigController:
             self.overlay.clear_widgets()
             self.overlay = None
             # refresh config display
-            self.show_node_configs(self.node_title, self.node_configs)
+            self.show_node_configs(self.node_title)
 
     def set_node_config_header(self, text: str, color=None, font_color=None) -> None:
         header = self.config_header
@@ -126,7 +130,8 @@ class ConfigController:
             val_eval = val
         print(f"val: {type(val)} {val}")
 
-        default_val = self.config_parser.get_default_value(self.node_title, key)
+        node_title = self.node_title
+        default_val = self.config_parser.get_default_value(node_title, key)
         print(f"check {val_eval} {type(val_eval)} =? {default_val} {type(default_val)}")
 
         for i, config in enumerate(self.node_configs):
@@ -134,18 +139,22 @@ class ConfigController:
                 # if user value == default value, remove config[key]
                 if val_eval == default_val:
                     # print(f"removing {i}, {config}")
-                    self.node_configs.pop(i)
+                    # self.node_configs.pop(i)
+                    self.pipeline_model.node_config_pop(node_title, key)
                 else:
                     # print(f"different, changing config[{key}]")
-                    config[key] = val_eval
+                    # config[key] = val_eval
+                    self.pipeline_model.node_config_set(node_title, key, val_eval)
                 return  # always return since something is updated
         # print(f"key {key} not found in any config")
         # if different from default value, add as new user config
         if val_eval != default_val:
             # print("add new user config")
-            self.node_configs.append({key: val_eval})
+            # self.node_configs.append({key: val_eval})
+            self.pipeline_model.node_config_set(node_title, key, val_eval)
 
-    def show_node_configs(self, node_title: str, node_configs: List) -> None:
+    def show_node_configs(self, node_title: str) -> None:
+        # def show_node_configs(self, node_title: str, node_configs_tmp: List) -> None:
         """Shows configuration for given node
 
         Args:
@@ -153,7 +162,12 @@ class ConfigController:
             node_config (List): list of node configurations
         """
         self.node_title = node_title  # reference to current node
-        self.node_configs = node_configs  # reference to current config
+        self.node_configs = self.pipeline_model.node_config_get(node_title)
+        self.draw_node_configs()
+
+    def draw_node_configs(self) -> None:
+        node_title = self.node_title
+        node_configs = self.node_configs
         node_type = get_node_type(node_title)
         node_color = NODE_RGBA_COLOR[node_type]
         # update node config view
