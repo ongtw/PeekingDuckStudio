@@ -5,6 +5,8 @@
 from typing import Any, Dict, List
 import yaml
 
+NO_CONFIG = [{"None": "No Config"}]
+
 
 class PipelineModel:
     def __init__(self, the_path: str) -> None:
@@ -69,7 +71,8 @@ class PipelineModel:
         for i, node in enumerate(pipeline_nodes):
             if isinstance(node, str):
                 node_title = node
-                node_config = [{"None": "No Config"}]
+                # node_config = [{"None": "No Config"}]
+                node_config = NO_CONFIG
             else:  # must be dict
                 node_title = list(node.keys())[0]
                 node_config = []
@@ -81,16 +84,21 @@ class PipelineModel:
             self._node_to_idx[node_title] = i
             self._node_to_config[node_title] = node_config
 
-    def node_add(self, node: str, i: int) -> None:
-        """Add node "node list" at given position index
+    def node_replace(self, i: int, node_title: str, node_config: List) -> None:
+        """Replace node at given position index, overwrite existing data
 
         Args:
-            node (_type_): node to be added
             i (int): node position index
+            node_title (str): new node title
+            node_config (List): new node config
         """
         assert 0 <= i < self._num_nodes
-        self._idx_to_node[i] = node
-        self._node_to_idx[node] = i
+        old_node = self._idx_to_node[i]
+        self._node_to_idx.pop(old_node)  # remove old node
+        self._node_to_config.pop(old_node)
+        self._idx_to_node[i] = node_title  # replace with new node
+        self._node_to_idx[node_title] = i
+        self._node_to_config[node_title] = node_config
         self.set_dirty_bit()
 
     def node_delete(self, node: str) -> None:
@@ -107,8 +115,8 @@ class PipelineModel:
             self.node_move_down(node)
         self._idx_to_node.pop()
         self._node_to_idx.pop(node)
-        self._num_nodes -= 1
         self._node_to_config.pop(node)
+        self._num_nodes -= 1
         self.set_dirty_bit()
 
     def node_get(self, i: int) -> str:
@@ -161,7 +169,12 @@ class PipelineModel:
         self.debug()
 
     def node_config_get(self, node: str) -> List:
-        return self._node_to_config[node]
+        # print(f"node_config_get: node={node}")
+        # print(self._node_to_config)
+        if node in self._node_to_config:
+            return self._node_to_config[node]
+        else:
+            return NO_CONFIG
 
     def node_config_set(self, node: str, key: str, val: Any) -> None:
         node_config: List = self._node_to_config[node]

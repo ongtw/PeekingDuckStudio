@@ -22,13 +22,27 @@ class NodeConfigParser:
         self.config_dirs = sorted([file for file in files if file.is_dir()])
         print("config_dirs:", self.config_dirs)
 
-    def get_default_configs(self, node_title: str):
+    def get_default_configs(self, node_title: str) -> Dict:
+        """Return the default set of configuration for given node
+
+        Args:
+            node_title (str): the node to get default config for
+
+        Returns:
+            Dict: the node's default configurations
+        """
         return self.default_config_map[node_title]
 
     def get_default_value(self, node_title: str, config_key: str):
         default_config = self.default_config_map[node_title]
         default_val = default_config[config_key]
         return default_val
+
+    def get_all_node_types(self) -> List[str]:
+        return list(self.nodes_by_type.keys())
+
+    def get_all_node_titles(self, node_type: str) -> List[str]:
+        return self.nodes_by_type[node_type]
 
     def get_string_representation(
         self, node_list: List[str], node_to_config: Dict[str, Any]
@@ -64,7 +78,7 @@ class NodeConfigParser:
 
         for config in self.config_dirs:
             node_type = config.name
-            # print(f"parsing node_type={node_type}")
+            # print(f"node_type={node_type}")
             files = sorted(config.glob("*.yml"))
             # working data structures
             node_list = []
@@ -138,6 +152,11 @@ def main():
     # print(config_parser.nodes_list)
     # print(config_parser.nodes_by_type)
     # print(config_parser.node_config_map)
+    all_node_types = config_parser.get_all_node_types()
+    print(f"all node types: {all_node_types}")
+    for node_type in all_node_types:
+        all_node_names = config_parser.get_all_node_titles(node_type)
+        print(f"{node_type}: {all_node_names}")
 
 
 if __name__ == "__main__":

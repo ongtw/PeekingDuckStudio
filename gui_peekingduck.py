@@ -3,7 +3,25 @@
 # DOTW, (C) 2022
 #
 
+# Todo list:
+# - edit config: check type
+# - edit config: present type-based options in DDL
+# - edit config: disallow custom input/output
+# - edit config: click yellow button to restore default
+# - output: playback speed?
+# - export output as video file
+# - save pipeline
+# - check for pipeline errors
+# - anomalous pipelines:
+#   * duplicate nodes
+#   * multiple nodes of same type (any allowed combo?)
+# - undo/redo
+# - support custom nodes definition
+# - app config: default folder, etc.
+
+##########
 # Globals
+##########
 ROOT_PATH = "/Users/dotw"
 CURR_PATH = "/Users/dotw/src/pkd/car_project"
 DIR_FILTERS = [""]
@@ -17,7 +35,9 @@ CONFIG_COLOR_CLEAR = (0.5, 0.5, 0.5, 0)
 BUTTON_DELAY = 0.2
 PLAYBACK_DELAY = 0.01
 
+##########
 # Imports
+##########
 from kivy.config import Config
 
 # change window size from 800x600 to 1024x768 (must be before other kivy modules)
@@ -31,14 +51,18 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
 
+from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
+
+# from kivy.uix.spinner import Spinner
 
 import os
 from re import A
 from typing import Dict, List
 from gui_widgets import (
     FileLoadDialog,
+    Node,
     ScreenPipeline,
     ScreenPlayback,
 )
@@ -47,20 +71,6 @@ from config_controller import ConfigController
 from output_controller import OutputController
 from pipeline_controller import PipelineController
 from pipeline_model import PipelineModel
-
-# Todo:
-# - add pipeline node
-# - delete pipeline node
-# - configure pipeline node
-# - save pipeline
-# - show pipeline errors
-# - anomalous pipelines:
-#   * duplicate nodes
-#   * multiple nodes of same type (any allowed combo?)
-# - undo/redo
-# - support custom nodes definition
-# - app config: default folder, etc.
-# - PKD playback
 
 
 class PeekingDuckGuiApp(App):
@@ -80,7 +90,7 @@ class PeekingDuckGuiApp(App):
         # Window.top = 100
 
         self.play = "stop"
-        self.selected_node = None
+        self.selected_node: Node = None
         self.all_selected_nodes = set()
         self.all_selected_configs = set()
         self.setup_output()
@@ -91,7 +101,7 @@ class PeekingDuckGuiApp(App):
         self.config_controller = ConfigController(
             self.config_parser, self.pipeline_view
         )
-        self.output_controller = OutputController(self.output_image)
+        self.output_controller = OutputController(self.config_parser, self.pkd_view)
         self.pipeline_controller = PipelineController(
             self.config_parser, self.pipeline_view
         )
@@ -127,13 +137,7 @@ class PeekingDuckGuiApp(App):
     # App GUI Widget Access
     def setup_output(self) -> None:
         screen = self.screen_playback
-        pkd_view = screen.ids["pkd_view"]
-        self.output_header = pkd_view.ids["pkd_header"]
-        self.output_container = pkd_view.ids["pkd_output"]
-        self.output_image = self.output_container.ids["image"]
-        # pkd_output.touch_down_callback = self.on_touch_down
-        pkd_controls = pkd_view.ids["pkd_controls"]
-        self.rounded_button_play_stop = pkd_controls.ids["btn_play_stop"]
+        self.pkd_view = screen.ids["pkd_view"]
 
     def setup_key_widgets(self) -> None:
         screen = self.screen_pipeline
@@ -144,10 +148,6 @@ class PeekingDuckGuiApp(App):
         # pre-declare working vars to avoid code crashing on var not found errors
         self.btn_node_move_down_held = None
         self.btn_node_move_up_held = None
-
-    # Change headers
-    def set_output_header(self, text: str) -> None:
-        self.output_header.header_text = text
 
     # Misc
     def clear_selected_configs(self) -> None:
@@ -183,6 +183,14 @@ class PeekingDuckGuiApp(App):
     def btn_goto_screen_playback(self, *args) -> None:
         self.sm.transition.direction = "left"
         self.sm.current = "screen_playback"
+        self.screen_playback.bind(on_enter=self.auto_play_once)
+
+    def auto_play_once(self, *args) -> None:
+        """Autostart playback upon entering playback screen"""
+        print(f"auto_play: args={args}")
+        self.screen_playback.unbind(on_enter=self.auto_play_once)
+        if self.pipeline_model:
+            self.output_controller.play_stop()  # auto play
 
     def show_node_configs(self) -> None:
         """Interface to Config Controller"""
@@ -190,36 +198,70 @@ class PeekingDuckGuiApp(App):
             return
         node = self.selected_node
         node_title = node.button.text
-        # node_config = self.pipeline_controller.get_node_config(node_title)
-        # self.config_controller.show_node_configs(node_title, node_config)
         self.config_controller.show_node_configs(node_title)
+
+    def btn_node_type_select(self, instance, *args) -> None:
+        """Set config header node type after node type spinner selection
+
+        Args:
+            instance (Button): the selected node type button
+        """
+        node_type = instance.text
+        print(f"btn_node_type_select: {node_type}")
+        instance.parent.node_type = node_type
+        self.config_controller.set_node_names(node_type)
+        # todo: change current model node? or only change after node name selected?
+
+    def btn_node_name_select(self, instance, *args) -> None:
+        """Set config header node name after node name spinner selection
+
+        Args:
+            instance (Button): the selected node name button
+        """
+        print(f"btn_node_name_select: {instance.text}")
+        instance.parent.node_name = instance.text
+        self.config_controller.show_node_configs()
+        node = self.selected_node
+        node_num = int(node.node_number)
+        node_title = node.button.text
+        new_node_title = self.config_controller.get_config_header_node_title()
+        print(f"  selected_node {node_num}:{node_title} change to {new_node_title}")
+        # for new node, there are zero user config (makes life easier)
+        new_node_config = [{"None": "No Config"}]
+        node_idx = node_num - 1  # index for old new to be replaced with new node
+        self.pipeline_model.node_replace(node_idx, new_node_title, new_node_config)
+        self.pipeline_controller.draw_nodes()
+        self.clear_selected_nodes()
+        # NB: need to clear all cached data about the old node...
+        # todo: change current model node
 
     def btn_toggle_config_state(self, *args) -> None:
         """Toggle show all or only user-defined configurations"""
         self.pipeline_controller.toggle_config_state()
         self.show_node_configs()
 
-    def btn_config_press(self, btn, *args) -> None:
+    def btn_config_press(self, btn: Button, *args) -> None:
         """This method is called when a node config is clicked
 
         Args:
-            btn (_type_): the config that is clicked on
+            btn (Button): the config that is clicked on
         """
         self.clear_selected_configs()
         # set new selected config
-        config = btn.parent
+        print(f"btn_config_press: btn.text={btn.text}")
+        floatlayout = btn.parent
+        config = floatlayout.parent
         config.select_color = CONFIG_COLOR_SELECTED
         self.all_selected_configs.add(config)
 
-    def btn_node_press(self, btn, *args) -> None:
+    def btn_node_press(self, node: Node, *args) -> None:
         """This method is called when a pipeline node is clicked
 
         Args:
-            btn (_type_): the node that is clicked on
+            node (Node): the node that is clicked on
         """
         self.clear_selected_nodes()
         # set new selected node
-        node = btn.parent
         node.select_color = NODE_COLOR_SELECTED
         self.all_selected_nodes.add(node)
         self.selected_node = node
@@ -236,6 +278,9 @@ class PeekingDuckGuiApp(App):
     def btn_save_file(self, btn, *args) -> None:
         print("btn_save_file: not implemented yet")
 
+    def btn_about(self, btn, *args) -> None:
+        print("btn_about: not implemented yet")
+
     def btn_quit(self, btn, *args) -> None:
         # todo: ask user to confirm quit / save changes
         self.stop()
@@ -249,44 +294,16 @@ class PeekingDuckGuiApp(App):
         print(f"btn_play_stop_press: tag={tag}")
         if self.pipeline_model is None:
             return
-        if tag == "play":
-            self.set_play_stop_btn_to_stop()
-            if self.pipeline_model.dirty:
-                # play modified pipeline
-                if hasattr(self.pipeline_model, "node_list"):
-                    pipeline_str = self.config_parser.get_string_representation(
-                        self.pipeline_model.node_list, self.pipeline_model.node_config
-                    )
-                    # print(f"nodes={pipeline_str}")
-                    self.output_controller.run_pipeline_start(pipeline_str)
-                    self.pipeline_model.clear_dirty_bit()
-            else:
-                # play last unchanged pipeline
-                self.btn_forward_press(args)
-        else:
-            self.set_play_stop_btn_to_play()
-            if self.output_controller.pipeline_running:
-                self.output_controller.stop_running_pipeline()
-            else:
-                if hasattr(self, "btn_forward_held"):
-                    self.btn_forward_release(args)
-
-    def set_play_stop_btn_to_play(self) -> None:
-        self.rounded_button_play_stop.tag = "play"
-
-    def set_play_stop_btn_to_stop(self) -> None:
-        self.rounded_button_play_stop.tag = "stop"
+        self.output_controller.play_stop()
 
     def btn_forward_press(self, *args) -> None:
         if self.output_controller.forward_one_frame():
             self.btn_forward_held = Clock.schedule_once(
                 self.btn_forward_press, PLAYBACK_DELAY
             )
-        else:
-            self.set_play_stop_btn_to_play()
 
     def btn_forward_release(self, *args) -> None:
-        if self.btn_forward_held:
+        if hasattr(self, "btn_forward_held"):
             self.btn_forward_held.cancel()
 
     def btn_backward_press(self, *args) -> None:
@@ -296,7 +313,7 @@ class PeekingDuckGuiApp(App):
             )
 
     def btn_backward_release(self, *args) -> None:
-        if self.btn_backward_held:
+        if hasattr(self, "btn_backward_held"):
             self.btn_backward_held.cancel()
 
     def btn_first_frame(self, *args) -> None:
@@ -342,11 +359,12 @@ class PeekingDuckGuiApp(App):
         # decode project info
         tokens = the_path.split("/")
         self.filename = tokens[-1]
-        self.set_output_header(self.filename)
         self.project_info.directory = os.path.dirname(the_path)
         self.project_info.filename = self.filename
         self.pipeline_model = PipelineModel(the_path)
         self.config_controller.set_pipeline_model(self.pipeline_model)
+        self.output_controller.set_pipeline_model(self.pipeline_model)
+        self.output_controller.set_output_header(self.filename)
         self.pipeline_controller.set_pipeline_model(self.pipeline_model)
         self.pipeline_controller.draw_nodes()
 

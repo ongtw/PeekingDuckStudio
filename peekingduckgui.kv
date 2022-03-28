@@ -1,5 +1,6 @@
 #:kivy 2.0.0
 #:import hex kivy.utils.get_color_from_hex
+#:import Factory kivy.factory.Factory
 
 # Globals: colors
 #:set BLACK 0, 0, 0, 1
@@ -17,6 +18,10 @@
 # Globals: sizing
 #:set HEADER_HEIGHT 40
 #:set CONTROLS_HEIGHT 40
+#:set NODE_HEIGHT 60
+#:set NODE_PADDING 5
+#:set CONFIG_HEIGHT 60
+#:set CONFIG_PADDING 5
 
 # Globals: GUI
 #:set GUI_COLOR NAVY
@@ -41,6 +46,11 @@
 #
 # Helper Widgets
 #
+<ButtonLabel>:
+    text: "ButtonLabel"
+    # callback_press: app.btn_press
+    # callback_release: app.btn_release
+
 <FileLoadDialog>:
     BoxLayout:
         id: id_box
@@ -78,7 +88,82 @@
         text: root.header_text
         bold: True
 
-#<RoundedButton@BoxLayout>:
+<CustomSpinnerOptions@SpinnerOption>:
+    background_normal: ""
+    background_color: NAVY
+    padding: dp(10), dp(10)
+    canvas.before:
+        Color:
+            rgba: 192/255, 192/255, 192/255, 1
+        Line:
+            width: dp(1)
+            rectangle: self.x, self.y, self.width, self.height
+
+<CustomDropDown@DropDown>:
+    max_height: dp(300)
+    bar_width: dp(5)
+    bar_color: GREEN
+    bar_inactive_color: RED
+    effect_cls: "ScrollEffect"
+    scroll_type: ["bars", "content"]
+
+<ConfigHeader@BoxLayout>:
+    font_color: 1, 1, 1, 1
+    header_color: 0, 0, 0, 1
+    node_type: ""
+    node_name: ""
+    size_hint: 1, None
+    height: dp(HEADER_HEIGHT)
+    state: "enabled"
+    callback_node_type: app.btn_node_type_select
+    callback_node_name: app.btn_node_name_select
+    canvas:
+        Color:
+            rgba: self.header_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    Label:  # spacer
+        text: ""
+        size_hint_x: None
+        width: dp(20)
+    Spinner:
+        id: spinner_node_type
+        background_normal: ""
+        background_color: root.header_color
+        color: root.font_color
+        bold: True
+        padding: 10, 10
+        size_hint: None, 1
+        text: root.node_type
+        width: dp(100)
+        on_text:
+            root.callback_node_type(self) if root.state == "enabled" else ""
+        # dropdown_cls: Factory.CustomDropDown
+        option_cls: Factory.CustomSpinnerOptions
+    Label:
+        id: the_dot
+        text: ""
+        size_hint_x: None
+        width: dp(10)
+    Spinner:
+        id: spinner_node_name
+        background_normal: ""
+        background_color: root.header_color
+        color: root.font_color
+        bold: True
+        size_hint: None, 1
+        text: root.node_name
+        width: dp(200)
+        on_text:
+            root.callback_node_name(self) if root.state == "enabled" else ""
+        # dropdown_cls: Factory.CustomDropDown
+        option_cls: Factory.CustomSpinnerOptions
+    Label:  # spacer till end
+        text: ""
+
+
+
 <RoundedButton>:
     orientation: "horizontal"
     text: ""
@@ -92,11 +177,9 @@
     Button:
         id: id_btn
         background_color: root.color_bkgd
-        btn_radius: [dp(10),]
         color: root.color_text
         font_name: "Arial"
         font_size: root.text_size
-        padding: (dp(10), dp(10))
         text: root.text
         on_press: root.callback_press(self)
         on_release: root.callback_release(self)
@@ -110,6 +193,7 @@
     Separator:
         line_color: root.color_separator
         width: dp(2)
+
 
 <Separator@Label>:
     line_color: 1, 1, 1, 1
@@ -128,9 +212,9 @@
     button: id_button
     cols: 2
     rows: 1
-    padding: [dp(10), dp(10), dp(10), dp(10)]
+    padding: [dp(NODE_PADDING), dp(NODE_PADDING), dp(NODE_PADDING), dp(NODE_PADDING)]
     size_hint: (1, None)
-    size: (0, dp(80))
+    size: (0, dp(NODE_HEIGHT))
     callback_press: app.btn_node_press
     canvas.after:
         Color:
@@ -151,7 +235,7 @@
         text_size: self.size
         text: root.node_text
         color: 0, 0, 0, 1
-        on_press: root.callback_press(self)
+        # on_press: root.callback_press(self)
         background_normal: ""
         background_color: root.bkgd_color
 
@@ -159,12 +243,11 @@
 <NodeConfig>:
     cols: 5
     rows: 1
-    padding: [dp(10), dp(10), dp(10), dp(10)]
+    padding: [dp(CONFIG_PADDING), dp(CONFIG_PADDING), dp(CONFIG_PADDING), dp(CONFIG_PADDING)]
     size_hint: (1, None)
-    size: (0, dp(80))
+    size: (0, dp(CONFIG_HEIGHT))
     callback_press: app.btn_config_press
-    # callback_release: app.btn_release
-    # to highlight if node is selected
+    # for highlighting node if selected
     the_button: id_btn_config
     the_overlay: id_overlay
     canvas.after:
@@ -179,7 +262,7 @@
         width: dp(20)
         Label:
             size_hint_y: None
-            height: dp(20)
+            height: dp(CONFIG_HEIGHT / 4)
         BoxLayout:
             size_hint_x: None
             width: dp(20)
@@ -202,7 +285,7 @@
                     size: self.width-dp(12), self.height-dp(12)
         Label:
             size_hint_y: None
-            height: dp(20)
+            height: dp(CONFIG_HEIGHT / 4)
     Separator:
         line_color: BLACK
         width: dp(5)
@@ -289,6 +372,9 @@
         text: "Run"
         callback_press: app.btn_goto_screen_playback
     RoundedButton:
+        text: "About"
+        callback_press: app.btn_about
+    RoundedButton:
         text: "Quit"
         callback_press: app.btn_quit
 
@@ -328,8 +414,9 @@
             size_hint: 1, None
             height: dp(HEADER_HEIGHT)
             BoxLayout:
+                # "toggle button" to show/hide node config items
                 size_hint_x: None
-                size_hint_x_max: dp(20)
+                width: dp(30)
                 canvas.before:
                     Color:
                         rgba: GUI_COLOR
@@ -345,20 +432,11 @@
                         "" if root.config_state == "" else TRIANGLE_DOWN \
                         if root.config_state == "expand" else TRIANGLE_RIGHT
                     callback_release: app.btn_toggle_config_state
-                    tag: "expand"
-            Header:
+            ConfigHeader:
                 id: pipeline_config_header
                 header_color: GUI_COLOR
-                header_text: "Node Config"
-            BoxLayout:
-                size_hint_x: None
-                size_hint_x_max: dp(20)
-                canvas.before:
-                    Color:
-                        rgba: pipeline_config_header.header_color
-                    Rectangle:
-                        size: self.size
-                        pos: self.pos
+                node_type_text: "Node"
+                node_name_text: "Config"
         Separator:
             direction: "horizontal"
             line_color: BLACK
@@ -458,11 +536,30 @@
 # Playback Output Widgets
 <Output>:
     cols: 1
-    rows: 1
+    rows: 2
+    visible: False
     Image:
         id: image
-    # Label:
-    #     text: "Output"
+    GridLayout:
+        id: grid
+        cols: 3
+        rows: 1
+        size_hint_y: None
+        height: dp(CONTROLS_HEIGHT)
+        Label:
+            id: playback_speed
+            text: "Speed: 1x"
+            opacity: 1 if root.visible else 0
+            size_hint_x: 0.2
+        Slider: # this widget gets replaced dynamically during runtime
+            id: slider
+            opacity: 1 if root.visible else 0
+            size_hint_x: 0.6
+        Label:
+            id: zoom
+            text: "Zoom: 1.0"
+            opacity: 1 if root.visible else 0
+            size_hint_x: 0.2
 
 <PeekingDuckControls@BoxLayout>:
     padding: 6
@@ -480,9 +577,6 @@
         text: TRIANGLE_RIGHT if self.tag == "play" else SQUARE
         text_size: sp(20)
         callback_press: app.btn_play_stop_press
-    RoundedButton:
-        tag: "pause"
-        text: "||"
     RoundedButton:
         tag: "first_frame"
         text: LINE_VERTICAL + TRIANGLE_LEFT

@@ -2,6 +2,9 @@
 # PeekingDuck GUI Controller for Pipeline Nodes
 #
 
+NODE_COLOR_SELECTED = (0, 0, 1, 0.5)
+NODE_COLOR_CLEAR = (0, 0, 1, 0)
+
 from typing import List
 from gui_widgets import Node
 from gui_utils import get_node_color
@@ -35,12 +38,17 @@ class PipelineController:
         # need to get the new_node equivalent of current node in order
         # to move scrollview to the new_node
         new_node = self.draw_nodes(node.node_text)
-        self.pipeline_nodes_view.scroll_to(new_node)
+        new_node.select_color = NODE_COLOR_SELECTED
+        parent = self.nodes_layout.parent
+        if self.nodes_layout.height > parent.height:
+            self.pipeline_nodes_view.scroll_to(new_node)
+        else:
+            self.pipeline_nodes_view.scroll_y = 1.0
 
     def set_pipeline_header(self, text: str) -> None:
         self.pipeline_header.header_text = text
 
-    def set_pipeline_model(self, pipeline_model) -> None:
+    def set_pipeline_model(self, pipeline_model: PipelineModel) -> None:
         self.pipeline_model = pipeline_model
 
     def toggle_config_state(self) -> None:
@@ -76,7 +84,7 @@ class PipelineController:
         self.set_pipeline_header(f"Pipeline: {n} nodes")
         for i in range(n):
             node_title = self.pipeline_model.node_get(i)
-            print(f"draw {node_title}")
+            # print(f"draw {node_title}")
             node_num = str(i + 1)
             node_color = get_node_color(node_title)
             node = Node(
