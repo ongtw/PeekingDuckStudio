@@ -6,7 +6,7 @@ from typing import List
 from gui_widgets import NodeConfig
 from gui_utils import get_node_type, NODE_RGBA_COLOR, BLACK, WHITE, NAVY
 from config_parser import NodeConfigParser
-from pipeline_model import PipelineModel
+from pipeline_model import ModelPipeline
 from kivy.clock import Clock
 from kivy.uix.textinput import TextInput
 import ast
@@ -22,10 +22,10 @@ class ConfigController:
         self.pipeline_config = pipeline_view.ids["pipeline_config"]
         self.config_layout = self.pipeline_config.ids["config_layout"]
         self.config_parser: NodeConfigParser = config_parser
-        self.pipeline_model: PipelineModel = None
+        self.pipeline_model: ModelPipeline = None
         self.overlay = None
 
-    def set_pipeline_model(self, pipeline_model: PipelineModel) -> None:
+    def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         self.pipeline_model = pipeline_model
         # set node type spinner values once since it's invariant
         # don't set in __init__ 'coz pipeline not loaded and it can cause

@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 from peekingduck.declarative_loader import DeclarativeLoader
 from peekingduck.pipeline.pipeline import Pipeline
 from config_parser import NodeConfigParser
-from pipeline_model import PipelineModel
+from pipeline_model import ModelPipeline
 from gui_widgets import Output
 
 PLAYBACK_INTERVAL = 1 / 60
@@ -25,7 +25,7 @@ ZOOM_TEXT = ["0.5", "0.75", "1.0", "1.25", "1.50", "2.0"]
 class OutputController:
     def __init__(self, config_parser: NodeConfigParser, pkd_view) -> None:
         self.config_parser: NodeConfigParser = config_parser
-        self.pipeline_model: PipelineModel = None
+        self.pipeline_model: ModelPipeline = None
         self.output_header = pkd_view.ids["pkd_header"]
         self.output_layout: Output = pkd_view.ids["pkd_output"]
         self.controls = pkd_view.ids["pkd_controls"]
@@ -39,7 +39,7 @@ class OutputController:
         self.blitz_texture(black_frame)
         self.zoom_idx = 2  # default 100% zoom
         # pipeline control vars
-        self.pipeline_model: PipelineModel = None
+        self.pipeline_model: ModelPipeline = None
         self.frames = None
         self._pipeline_running = False
         self._output_playback = False
@@ -54,7 +54,7 @@ class OutputController:
     def set_output_header(self, text: str) -> None:
         self.output_header.header_text = text
 
-    def set_pipeline_model(self, pipeline_model: PipelineModel) -> None:
+    def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         self.pipeline_model = pipeline_model
 
     #####################

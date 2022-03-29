@@ -9,7 +9,7 @@ from typing import List
 from gui_widgets import Node
 from gui_utils import get_node_color
 from config_parser import NodeConfigParser
-from pipeline_model import PipelineModel
+from pipeline_model import ModelPipeline
 
 
 class PipelineController:
@@ -19,20 +19,29 @@ class PipelineController:
         self.pipeline_nodes_view = self.pipeline_view.ids["pipeline_nodes"]
         self.nodes_layout = self.pipeline_nodes_view.ids["pipeline_layout"]
         self.config_parser: NodeConfigParser = config_parser
-        self.pipeline_model: PipelineModel = None
+        self.pipeline_model: ModelPipeline = None
 
     def get_node_config(self, node_title: str):
         node_config = self.pipeline_model.node_config_get(node_title)
         return node_config
 
-    def move_node(self, node: Node, direction: str) -> None:
+    def add_node(self, idx: int) -> None:
+        print(f"add_node: at index {idx}")
+        self.pipeline_model.node_insert(idx)
+        self.draw_nodes()
+
+    def delete_node(self, idx: int) -> None:
+        print(f"delete node: at index {idx}")
+        self.pipeline_model.node_delete(idx)
+        self.draw_nodes()
+
+    def move_node(self, node: Node, direction: str) -> Node:
         if direction == "up":
             self.pipeline_model.node_move_up(node.node_text)
         elif direction == "down":
             self.pipeline_model.node_move_down(node.node_text)
         else:
-            print(f"move_node: unknown direction {direction}")
-            return
+            raise ValueError(f"move_node: unknown direction {direction}")
 
         # as self.draw_nodes() clears all widgets and makes new ones,
         # need to get the new_node equivalent of current node in order
@@ -44,11 +53,12 @@ class PipelineController:
             self.pipeline_nodes_view.scroll_to(new_node)
         else:
             self.pipeline_nodes_view.scroll_y = 1.0
+        return new_node
 
     def set_pipeline_header(self, text: str) -> None:
         self.pipeline_header.header_text = text
 
-    def set_pipeline_model(self, pipeline_model: PipelineModel) -> None:
+    def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         self.pipeline_model = pipeline_model
 
     def toggle_config_state(self) -> None:

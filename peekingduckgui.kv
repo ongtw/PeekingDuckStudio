@@ -18,9 +18,9 @@
 # Globals: sizing
 #:set HEADER_HEIGHT 40
 #:set CONTROLS_HEIGHT 40
-#:set NODE_HEIGHT 60
+#:set NODE_HEIGHT 70
 #:set NODE_PADDING 5
-#:set CONFIG_HEIGHT 60
+#:set CONFIG_HEIGHT 70
 #:set CONFIG_PADDING 5
 
 # Globals: GUI
@@ -345,9 +345,11 @@
         tag: "node_add"
         text: "+"
         text_size: sp(20)
+        callback_press: app.btn_node_add
     RoundedButton:
         tag: "node_delete"
         text: EN_DASH
+        callback_press: app.btn_node_delete
     RoundedButton:
         tag: "node_up"
         text: TRIANGLE_UP
@@ -362,6 +364,9 @@
 <PipelineControls@BoxLayout>:
     padding: 6
     spacing: 10
+    RoundedButton:
+        text: "New"
+        callback_press: app.btn_new_file
     RoundedButton:
         text: "Load"
         callback_press: app.btn_load_file

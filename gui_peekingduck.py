@@ -4,19 +4,22 @@
 #
 
 # Todo list:
-# - edit config: check type
-# - edit config: present type-based options in DDL
-# - edit config: disallow custom input/output
+# - support custom nodes definition
 # - edit config: click yellow button to restore default
+# - edit config: disable input/output, read-only
+# - edit config: value range check
+# - edit config: value type check
+# - edit config: present type-based options when setting values
 # - output: playback speed?
 # - export output as video file
-# - save pipeline
-# - check for pipeline errors
+# - pipeline: new
+# - pipeline: save
+# - pipeline: error check
+# - pipeline: multiple select(?)
 # - anomalous pipelines:
 #   * duplicate nodes
 #   * multiple nodes of same type (any allowed combo?)
 # - undo/redo
-# - support custom nodes definition
 # - app config: default folder, etc.
 
 ##########
@@ -70,7 +73,7 @@ from config_parser import NodeConfigParser
 from config_controller import ConfigController
 from output_controller import OutputController
 from pipeline_controller import PipelineController
-from pipeline_model import PipelineModel
+from pipeline_model import ModelPipeline
 
 
 class PeekingDuckGuiApp(App):
@@ -267,7 +270,10 @@ class PeekingDuckGuiApp(App):
         self.selected_node = node
         self.show_node_configs()
 
-    def btn_load_file(self, btn, *args) -> None:
+    def btn_new_file(self, btn) -> None:
+        print("btn_new_file: not implemented yet")
+
+    def btn_load_file(self, btn) -> None:
         file_dialog = FileLoadDialog(select=self.load_file, cancel=self.cancel_load)
         file_dialog.setup(root_path=ROOT_PATH, path=CURR_PATH, filters=FILE_FILTERS)
         self._file_dialog = Popup(
@@ -275,13 +281,13 @@ class PeekingDuckGuiApp(App):
         )
         self._file_dialog.open()
 
-    def btn_save_file(self, btn, *args) -> None:
+    def btn_save_file(self, btn) -> None:
         print("btn_save_file: not implemented yet")
 
-    def btn_about(self, btn, *args) -> None:
+    def btn_about(self, btn) -> None:
         print("btn_about: not implemented yet")
 
-    def btn_quit(self, btn, *args) -> None:
+    def btn_quit(self, btn) -> None:
         # todo: ask user to confirm quit / save changes
         self.stop()
 
@@ -290,10 +296,10 @@ class PeekingDuckGuiApp(App):
 
     # Playback controls
     def btn_play_stop_press(self, btn, *args) -> None:
-        tag = btn.parent.tag
-        print(f"btn_play_stop_press: tag={tag}")
         if self.pipeline_model is None:
             return
+        tag = btn.parent.tag
+        print(f"btn_play_stop_press: tag={tag}")
         self.output_controller.play_stop()
 
     def btn_forward_press(self, *args) -> None:
@@ -361,7 +367,7 @@ class PeekingDuckGuiApp(App):
         self.filename = tokens[-1]
         self.project_info.directory = os.path.dirname(the_path)
         self.project_info.filename = self.filename
-        self.pipeline_model = PipelineModel(the_path)
+        self.pipeline_model = ModelPipeline(the_path)
         self.config_controller.set_pipeline_model(self.pipeline_model)
         self.output_controller.set_pipeline_model(self.pipeline_model)
         self.output_controller.set_output_header(self.filename)
@@ -371,11 +377,36 @@ class PeekingDuckGuiApp(App):
     #####################
     # Pipeline processing
     #####################
+    def btn_node_add(self, instance) -> None:
+        if self.pipeline_model is None:
+            return
+        print("btn_node_add")
+        if self.selected_node:
+            idx = int(self.selected_node.node_number) - 1
+        else:
+            idx = self.pipeline_model.num_nodes
+        self.pipeline_controller.add_node(idx)
+        self.selected_node = None
+
+    def btn_node_delete(self, instance) -> None:
+        if self.pipeline_model is None:
+            return
+        print("btn_node_delete")
+        if self.selected_node:
+            idx = int(self.selected_node.node_number) - 1
+            self.pipeline_controller.delete_node(idx)
+            self.selected_node = None
+        else:
+            print("nothing selected to delete")
+
     def btn_node_move_up_press(self, *args) -> None:
         if self.all_selected_nodes:
             for node in self.all_selected_nodes:
                 break  # only handle one node for now
-            self.pipeline_controller.move_node(node, "up")
+            # NB: moving will invalidate current selected node due to clearing and
+            # recreating widgets
+            new_node = self.pipeline_controller.move_node(node, "up")
+            self.selected_node = new_node
             self.btn_node_move_up_held = Clock.schedule_once(
                 self.btn_node_move_up_press, BUTTON_DELAY
             )
@@ -383,12 +414,19 @@ class PeekingDuckGuiApp(App):
     def btn_node_move_up_release(self, *args) -> None:
         if self.btn_node_move_up_held:
             self.btn_node_move_up_held.cancel()
+        node = self.selected_node
+        node_num = int(node.node_number)
+        node_title = node.button.text
+        print(f"btn_node_move_up_release: selected={node_num} {node_title}")
 
     def btn_node_move_down_press(self, *args) -> None:
         if self.all_selected_nodes:
             for node in self.all_selected_nodes:
                 break  # only handle one node for now
-            self.pipeline_controller.move_node(node, "down")
+            # NB: moving will invalidate current selected node due to clearing and
+            # recreating widgets
+            new_node = self.pipeline_controller.move_node(node, "down")
+            self.selected_node = new_node
             self.btn_node_move_down_held = Clock.schedule_once(
                 self.btn_node_move_down_press, BUTTON_DELAY
             )
@@ -396,6 +434,10 @@ class PeekingDuckGuiApp(App):
     def btn_node_move_down_release(self, *args) -> None:
         if self.btn_node_move_down_held:
             self.btn_node_move_down_held.cancel()
+        node = self.selected_node
+        node_num = int(node.node_number)
+        node_title = node.button.text
+        print(f"btn_node_move_down_release: selected={node_num} {node_title}")
 
     def btn_verify_pipeline(self, *args) -> None:
         res = self.pipeline_controller.verify_pipeline()
