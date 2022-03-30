@@ -2,6 +2,7 @@
 # Kivy Widget Classes
 #
 from kivy.clock import Clock
+from kivy.factory import Factory
 from kivy.metrics import Metrics
 from kivy.properties import (
     BooleanProperty,
@@ -19,12 +20,13 @@ from kivy.uix.screenmanager import Screen
 from kivy.uix.slider import Slider
 
 from typing import List
-from gui_utils import NAVY
+from gui_utils import get_node_color, NAVY
 
 SINGLE_TAP_DELAY = 0.25
 
 
 class ButtonLabel(ButtonBehavior, Label):
+    # experimental
     callback_press = ObjectProperty(None)
     callback_release = ObjectProperty(None)
 
@@ -46,9 +48,18 @@ class Node(GridLayout):
     select_color = ListProperty([0, 0, 0, 0])
     node_number = ObjectProperty("0")  # shown as index in GUI
     node_text = ObjectProperty("")
+    # don't use 'uid' as Kivy seems to use it internally, so will conflict!
+    node_id = StringProperty("")
     callback_double_tap = ObjectProperty(None)
     # callback_press = ObjectProperty(None)
     scheduled_press = None
+
+    def __init__(self, uid: str, node_title: str, node_idx: int, **kwargs):
+        super().__init__(**kwargs)
+        self.node_id = uid
+        self.node_text = node_title
+        self.node_number = str(node_idx)
+        self.bkgd_color = get_node_color(node_title)
 
     def on_touch_down(self, touch):
         if self.collide_point(*touch.pos):
@@ -63,11 +74,13 @@ class Node(GridLayout):
                     self.callback_double_tap(self)
             else:
                 print(f"Node.on_touch_down: tap {self.node_text}")
+                # dotw: Need to schedule do_press in order to properly differentiate
+                # between single and double tap. If double tap occurs, then cancel
+                # the single tap do_press callback.
                 if self.callback_press:
                     self.scheduled_press = Clock.schedule_once(
                         self.do_press, SINGLE_TAP_DELAY
                     )
-                    # self.callback_press(self)
             return True  # stop event from percolating
         return super().on_touch_down(touch)
 
@@ -79,9 +92,11 @@ class Node(GridLayout):
 class NodeConfig(GridLayout):
     bkgd_color = ListProperty([0, 0, 1, 1])
     select_color = ListProperty([0, 0, 0, 0])
-    config_key = ObjectProperty("key")
+    config_key = StringProperty("key")
+    config_type = StringProperty("nonetype")
     config_value = ObjectProperty("value")
     config_set = BooleanProperty(False)
+    config_readonly = BooleanProperty(False)
     callback_double_tap = ObjectProperty(None)
 
     def on_touch_down(self, touch):
@@ -105,8 +120,8 @@ class Output(GridLayout):
         grid.add_widget(progress)
         self.ids["progress"] = progress  # set kivy id in python code
         grid.add_widget(left_label)
-        for i, child in enumerate(grid.children):
-            print(f"{i} {child}")
+        # for i, child in enumerate(grid.children):
+        #     print(f"{i} {child}")
 
     def install_slider(self) -> None:
         grid = self.ids["grid"]
@@ -118,8 +133,8 @@ class Output(GridLayout):
         grid.add_widget(slider)
         self.ids["slider"] = slider  # set kivy id in python code
         grid.add_widget(left_label)
-        for i, child in enumerate(grid.children):
-            print(f"{i} {child}")
+        # for i, child in enumerate(grid.children):
+        #     print(f"{i} {child}")
 
     # def on_touch_down(self, touch):
     # if self.collide_point(*touch.pos):
@@ -130,6 +145,14 @@ class Output(GridLayout):
 class ProjectInfo(GridLayout):
     directory = StringProperty("")
     filename = StringProperty("")
+    callback_tap = ObjectProperty(None)
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            if self.callback_tap:
+                print("Yes")
+                self.callback_tap(self)
+        return super().on_touch_down(touch)
 
 
 class RoundedButton(BoxLayout):
@@ -147,3 +170,19 @@ class ScreenPipeline(Screen):
 
 class ScreenPlayback(Screen):
     pass
+
+
+class MsgBox:
+    """Custom dialog box class for messages"""
+
+    def __init__(self, title: str, msg: str, btn_close_text: str) -> None:
+        self._title = title
+        self._msg = msg
+        self._btn_close_text = btn_close_text
+
+    def show(self) -> None:
+        popup = Factory.MsgBoxPopup()
+        popup.title = self._title
+        popup.message.text = self._msg
+        popup.close_button.text = self._btn_close_text
+        popup.open()

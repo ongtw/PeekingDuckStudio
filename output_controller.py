@@ -2,10 +2,12 @@
 # PeekingDuck GUI Controller for Output Playback
 #
 
+from contextlib import redirect_stderr, redirect_stdout
 import copy
-import os
 import cv2
+from io import StringIO
 import numpy as np
+import os
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from tempfile import TemporaryDirectory
@@ -13,7 +15,7 @@ from peekingduck.declarative_loader import DeclarativeLoader
 from peekingduck.pipeline.pipeline import Pipeline
 from config_parser import NodeConfigParser
 from pipeline_model import ModelPipeline
-from gui_widgets import Output
+from gui_widgets import Output, MsgBox
 
 PLAYBACK_INTERVAL = 1 / 60
 ZOOMS = [0.5, 0.75, 1.0, 1.25, 1.50, 2.00]
@@ -60,6 +62,10 @@ class OutputController:
     #####################
     # Output playback
     #####################
+    def replay(self) -> None:
+        self.pipeline_model.set_dirty_bit()
+        self.play_stop()
+
     def play_stop(self) -> None:
         tag = self.play_stop_btn_parent.tag
         print(f"play_stop: tag={tag}")
@@ -68,10 +74,9 @@ class OutputController:
             if self.pipeline_model.dirty:
                 # play modified pipeline
                 pipeline_str = self.config_parser.get_string_representation(
-                    self.pipeline_model.node_list, self.pipeline_model.node_config
+                    self.pipeline_model.node_list
                 )
                 self.run_pipeline_start(pipeline_str)
-                self.pipeline_model.clear_dirty_bit()
             else:
                 # play last unmodified pipeline
                 self.do_playback()
@@ -96,16 +101,14 @@ class OutputController:
             self.frame_idx += 1
             self.show_frame()
             return True
-        else:
-            return False
+        return False
 
     def _backward_one_frame(self) -> bool:
         if self.frame_idx > 0:
             self.frame_idx -= 1
             self.show_frame()
             return True
-        else:
-            return False
+        return False
 
     def stop_playback(self) -> None:
         if hasattr(self, "forward_one_frame_held"):
@@ -140,6 +143,25 @@ class OutputController:
             return
         self.frame_idx = len(self.frames) - 1
         self.show_frame()
+
+    def zoom_in(self) -> None:
+        if self.zoom_idx + 1 < len(ZOOMS):
+            self.zoom_idx += 1
+            self.update_zoom_text()
+
+    def zoom_out(self) -> None:
+        if self.zoom_idx > 0:
+            self.zoom_idx -= 1
+            self.update_zoom_text()
+
+    def update_zoom_text(self) -> None:
+        glyph = ZOOM_TEXT[self.zoom_idx]
+        self.zoom.text = f"Zoom: {glyph}"
+        self.show_frame()
+
+    # Progress/Slider, Zoom
+    def disable_progress(self) -> None:
+        pass
 
     def enable_progress(self) -> None:
         self.progress = self.output_layout.ids["progress"]
@@ -177,13 +199,40 @@ class OutputController:
     def run_pipeline_start(
         self, pipeline_str: str, custom_nodes_parent_subdir=None
     ) -> None:
-        self.load_pipeline(pipeline_str, custom_nodes_parent_subdir)
-        self.frames = []
-        self.frame_idx = -1
-        self.disable_slider()
-        self.output_layout.install_progress_bar()
-        self.enable_zoom()
-        Clock.schedule_once(self.run_one_pipeline_iteration, PLAYBACK_INTERVAL)
+        def parse_streams(strio: StringIO) -> str:
+            msg = strio.getvalue()
+            msg = os.linesep.join([s for s in msg.splitlines() if s])
+            return msg
+
+        exc_msg: str = ""
+        _out = StringIO()
+        _err = StringIO()
+        with redirect_stderr(_err), redirect_stdout(_out):
+            try:
+                self.load_pipeline(pipeline_str, custom_nodes_parent_subdir)
+                self.frames = []
+                self.frame_idx = -1
+                self.disable_slider()
+                self.output_layout.install_progress_bar()
+                self.enable_zoom()
+                Clock.schedule_once(self.run_one_pipeline_iteration, PLAYBACK_INTERVAL)
+            except BaseException as e:
+                self.set_play_stop_btn_to_play()
+                print("PeekingDuck Error!")
+                exc_msg = str(e)
+                print("exc_msg:", len(exc_msg))
+                print(exc_msg)
+
+        err_msg = parse_streams(_err)
+        out_msg = parse_streams(_out)
+        print("err_msg:", len(err_msg), "\n", err_msg)
+        print("exc_msg:", len(exc_msg), "\n", exc_msg)
+        print("out_msg:", len(out_msg), "\n", out_msg)
+
+        if exc_msg or err_msg:
+            the_msg = err_msg if err_msg else exc_msg
+            msgbox = MsgBox("PeekingDuck Runtime Error", the_msg, "Ok")
+            msgbox.show()
 
     def run_pipeline_done(self, *args) -> None:
         # clean up nodes with threads
@@ -194,67 +243,77 @@ class OutputController:
         self._pipeline_running = False
         self.output_layout.install_slider()
         self.enable_slider()
+        self.pipeline_model.clear_dirty_bit()  # only if all ends well
 
     def run_one_pipeline_iteration(self, *args) -> None:
-        self._pipeline_running = True
-        for node in self.pipeline.nodes:
-            if self.pipeline.data.get("pipeline_end", False):
-                self.pipeline.terminate = True
-                if "pipeline_end" not in node.inputs:
-                    continue
-            if "all" in node.inputs:
-                inputs = copy.deepcopy(self.pipeline.data)
-            else:
-                inputs = {
-                    key: self.pipeline.data[key]
-                    for key in node.inputs
-                    if key in self.pipeline.data
-                }
-            if hasattr(node, "optional_inputs"):
-                for key in node.optional_inputs:
-                    # The nodes will not receive inputs with the optional
-                    # key if it's not found upstream
-                    if key in self.pipeline.data:
-                        inputs[key] = self.pipeline.data[key]
-            if node.name.endswith("output.screen"):
-                # intercept screen output to Kivy
-                img = self.pipeline.data["img"]
-                # opencv top-left = (0,0), kivy bottom-left = (0,0)
-                frame = cv2.flip(img, 0)  # flip around x-axis
-                self.frames.append(frame)  # save frame for playback
-                self.frame_idx += 1
-                self.show_frame()
-            else:
-                outputs = node.run(inputs)
-                self.pipeline.data.update(outputs)
-            # check for FPS on first iteration
-            if self.frame_idx == 0 and node.name.endswith("input.visual"):
-                num_frames = node.total_frame_count
-                if num_frames > 0:
-                    self.num_frames = num_frames
-                    self.enable_progress()
+        # todo: capture runtime error msgs here
+        try:
+            self._pipeline_running = True
+            for node in self.pipeline.nodes:
+                if self.pipeline.data.get("pipeline_end", False):
+                    self.pipeline.terminate = True
+                    if "pipeline_end" not in node.inputs:
+                        continue
+                if "all" in node.inputs:
+                    inputs = copy.deepcopy(self.pipeline.data)
                 else:
-                    self.num_frames = 0
-                    self.progress = None
+                    inputs = {
+                        key: self.pipeline.data[key]
+                        for key in node.inputs
+                        if key in self.pipeline.data
+                    }
+                if hasattr(node, "optional_inputs"):
+                    for key in node.optional_inputs:
+                        # The nodes will not receive inputs with the optional
+                        # key if it's not found upstream
+                        if key in self.pipeline.data:
+                            inputs[key] = self.pipeline.data[key]
+                if node.name.endswith("output.screen"):
+                    # intercept screen output to Kivy
+                    img = self.pipeline.data["img"]
+                    # opencv top-left = (0,0), kivy bottom-left = (0,0)
+                    frame = cv2.flip(img, 0)  # flip around x-axis
+                    self.frames.append(frame)  # save frame for playback
+                    self.frame_idx += 1
+                    self.show_frame()
+                else:
+                    outputs = node.run(inputs)
+                    self.pipeline.data.update(outputs)
+                # check for FPS on first iteration
+                if self.frame_idx == 0 and node.name.endswith("input.visual"):
+                    num_frames = node.total_frame_count
+                    if num_frames > 0:
+                        self.num_frames = num_frames
+                        self.enable_progress()
+                    else:
+                        self.num_frames = 0
+                        self.progress = None
 
-        if self.progress:
-            self.progress.value += 1
+            if self.progress:
+                self.progress.value += 1
 
-        if not self.pipeline.terminate:
-            Clock.schedule_once(self.run_one_pipeline_iteration, PLAYBACK_INTERVAL)
-        else:
-            Clock.schedule_once(self.run_pipeline_done, PLAYBACK_INTERVAL)
+            if not self.pipeline.terminate:
+                Clock.schedule_once(self.run_one_pipeline_iteration, PLAYBACK_INTERVAL)
+            else:
+                Clock.schedule_once(self.run_pipeline_done, PLAYBACK_INTERVAL)
+        except BaseException as e:
+            print("PeekingDuck Error!")
+            print(e)
+            self.run_pipeline_done()
+            self.disable_slider()
+            self.pipeline_model.set_dirty_bit()  # but all is not well
 
     def stop_running_pipeline(self) -> None:
         self.pipeline.terminate = True
 
     def show_frame(self) -> None:
-        frame = self.frames[self.frame_idx]
-        frame = self.apply_zoom(frame)
-        self.blitz_texture(frame)
-        # mimic an observer pattern-like behavior...
-        # not as cool as binding slider.value directly to self.frame_idx :(
-        self.slider.value = self.frame_idx + 1
+        if self.frames:
+            frame = self.frames[self.frame_idx]
+            frame = self.apply_zoom(frame)
+            self.blitz_texture(frame)
+            # mimic an observer pattern-like behavior...
+            # not as cool as binding slider.value directly to self.frame_idx :(
+            self.slider.value = self.frame_idx + 1
 
     def apply_zoom(self, frame: np.ndarray) -> np.ndarray:
         # print(f"zoom_idx={self.zoom_idx}")
@@ -289,18 +348,3 @@ class OutputController:
             )
             self.pipeline: Pipeline = self.node_loader.get_pipeline()
             print(f"self.pipeline: {self.pipeline}")
-
-    def zoom_in(self) -> None:
-        if self.zoom_idx + 1 < len(ZOOMS):
-            self.zoom_idx += 1
-            self.update_zoom_text()
-
-    def zoom_out(self) -> None:
-        if self.zoom_idx > 0:
-            self.zoom_idx -= 1
-            self.update_zoom_text()
-
-    def update_zoom_text(self) -> None:
-        glyph = ZOOM_TEXT[self.zoom_idx]
-        self.zoom.text = f"Zoom: {glyph}"
-        self.show_frame()

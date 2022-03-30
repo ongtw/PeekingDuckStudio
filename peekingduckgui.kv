@@ -18,9 +18,9 @@
 # Globals: sizing
 #:set HEADER_HEIGHT 40
 #:set CONTROLS_HEIGHT 40
-#:set NODE_HEIGHT 70
+#:set NODE_HEIGHT 80
 #:set NODE_PADDING 5
-#:set CONFIG_HEIGHT 70
+#:set CONFIG_HEIGHT 80
 #:set CONFIG_PADDING 5
 
 # Globals: GUI
@@ -35,8 +35,10 @@
 #:set BLOCK_RIGHT "\u2590"
 #:set EM_DASH "\u2014"
 #:set EN_DASH "\u2013"
+#:set HEBREW_PE "\u05E4"
 #:set IOTA "\u0196"
 #:set LINE_VERTICAL "\u007C"
+#:set NOTES "\u266B"
 #:set SQUARE "\u25A0"
 #:set TRIANGLE_DOWN "\u25BC"
 #:set TRIANGLE_LEFT "\u25C4"
@@ -50,6 +52,57 @@
     text: "ButtonLabel"
     # callback_press: app.btn_press
     # callback_release: app.btn_release
+
+<MsgBoxPopup@Popup>:
+    close_button: butt
+    message: message
+    auto_dismiss: False
+    title: "MsgBox"
+    size_hint: None, None
+    width: grid.width + dp(25)
+    height: grid.height + root.title_size + dp(48)
+    
+    GridLayout:
+        id: grid
+        size_hint: None, None
+        size: self.minimum_size
+        padding: [10, 5]
+        cols: 1
+        AnchorLayout:
+            anchor_x: "center"
+            anchor_y: "bottom"
+            size_hint: None, None
+            height: message.height
+            width: max(message.width, butt.width)
+            Label: 
+                id: message
+                size_hint: None, None
+                size: self.texture_size
+                padding: [10, 5]
+        Label:  # spacer
+            size_hint_y: None
+            height: dp(10)
+        Separator:
+            direction: "horizontal"
+        Label:  # spacer
+            size_hint_y: None
+            height: dp(20)
+        AnchorLayout:
+            anchor_x: "center"
+            anchor_y: "bottom"
+            size_hint: None, None
+            height: butt.height
+            width: max(message.width, butt.width)
+            Button:
+                id: butt
+                text: "Close"
+                size_hint: None, None
+                # size_hint_min_x: dp(100)
+                # size: self.texture_size
+                width: self.texture_size[0] if self.texture_size[0] > 100 else 100
+                height: self.texture_size[1]
+                padding: [10, 5]
+                on_release: root.dismiss()
 
 <FileLoadDialog>:
     BoxLayout:
@@ -247,6 +300,7 @@
     size_hint: (1, None)
     size: (0, dp(CONFIG_HEIGHT))
     callback_press: app.btn_config_press
+    callback_set_default_press: app.btn_config_set_default_press
     # for highlighting node if selected
     the_button: id_btn_config
     the_overlay: id_overlay
@@ -279,10 +333,15 @@
                     size: self.width-dp(4), self.height-dp(4)
                 # indicator for user modified config
                 Color:
-                    rgba: YELLOW if root.config_set else BLACK
+                    rgba: RED if root.config_readonly else YELLOW if root.config_set else BLACK
                 Rectangle:
-                    pos: self.x+dp(6), self.y+dp(6)
-                    size: self.width-dp(12), self.height-dp(12)
+                    pos: self.x+dp(6), self.y+dp(10)
+                    size: self.width-dp(12), self.height-dp(20)
+            # trick to get an invisible button that can still be pressed
+            Button:
+                text: "A"
+                opacity: 0.0
+                on_press: root.callback_set_default_press(self)
         Label:
             size_hint_y: None
             height: dp(CONFIG_HEIGHT / 4)
@@ -297,6 +356,7 @@
             valign: "middle"
             text_size: self.size
             text: root.config_key
+            color: RED if root.config_readonly else WHITE
     Separator:
         line_color: BLACK
         width: dp(5)
@@ -309,6 +369,7 @@
             valign: "middle"
             text_size: self.size
             text: root.config_value
+            color: RED if root.config_readonly else WHITE
             on_press: root.callback_press(self)
             overlay: root.the_overlay
         BoxLayout:
@@ -376,6 +437,10 @@
     RoundedButton:
         text: "Run"
         callback_press: app.btn_goto_screen_playback
+    RoundedButton:
+        tag: "off"
+        text: "No " + NOTES if self.tag == "off" else NOTES
+        callback_press: app.btn_sound_on_off
     RoundedButton:
         text: "About"
         callback_press: app.btn_about
@@ -576,6 +641,12 @@
         callback_press: app.btn_goto_screen_pipeline
     Separator:
         line_color: GUI_COLOR
+    RoundedButton:
+        id: btn_replay
+        tag: "replay"
+        text: HEBREW_PE
+        text_size: sp(20)
+        callback_press: app.btn_replay_press
     RoundedButton:
         id: btn_play_stop
         tag: "play"
