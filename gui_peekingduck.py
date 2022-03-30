@@ -51,11 +51,9 @@ Config.set("graphics", "resizable", False)
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
-from kivy.input.providers.mouse import MouseMotionEvent
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
-from pygame import mixer
 
 import os
 from typing import List
@@ -72,6 +70,7 @@ from gui_widgets import (
     Node,
     ScreenPipeline,
     ScreenPlayback,
+    Sounds,
 )
 from config_parser import NodeConfigParser
 from config_controller import ConfigController
@@ -102,21 +101,11 @@ class PeekingDuckGuiApp(App):
         self.all_selected_configs = set()
         self.setup_key_widgets()
         self.setup_gui_working_vars()
-
-        self._sound_on = False
-        self._mixer = mixer
-        self._mixer.init()
-        # self._snd_add_node = mixer.Sound("sounds/camera-13695.mp3")
-        # self._snd_add_node = mixer.Sound("sounds/trumpet-e4-14829.mp3")
-        self._snd_add_node = mixer.Sound("sounds/message-ringtone-21467.mp3")
-        # self._snd_delete_node = mixer.Sound("sounds/aduio-1-20577.mp3")
-        # self._snd_delete_node = mixer.Sound("sounds/beep-sound-8333.mp3")
-        self._snd_delete_node = mixer.Sound("sounds/chew-21768.mp3")
-        # self._snd_delete_node.set_volume(0.5)
+        self.sounds = Sounds()
 
         self.config_parser = NodeConfigParser()
         self.config_controller = ConfigController(
-            self.config_parser, self.pipeline_view, mixer
+            self.config_parser, self.pipeline_view, self.sounds
         )
         self.output_controller = OutputController(self.config_parser, self.pkd_view)
         self.pipeline_controller = PipelineController(
@@ -361,8 +350,10 @@ class PeekingDuckGuiApp(App):
         """
         parent = btn.parent
         print(f"btn_sound_on_off: tag={parent.tag}")
-        self._sound_on = not self._sound_on
-        parent.tag = "on" if self._sound_on else "off"
+        # self._sound_on = not self._sound_on
+        # parent.tag = "on" if self._sound_on else "off"
+        self.sounds.sound_on = not self.sounds.sound_on
+        parent.tag = "on" if self.sounds.sound_on else "off"
 
     def btn_about(self, btn) -> None:
         """Show About this Program dialog box
@@ -511,8 +502,8 @@ A pipeline editor and playback viewer for PeekingDuck
         self.btn_node_press(gui_node)
         self.anim_function = shake_widget
         Clock.schedule_once(self.clock_do_anim_node, 0.2)
-        if self._sound_on:
-            self._snd_add_node.play()
+        if self.sounds.sound_on:
+            self.sounds.snd_add_node.play()
 
     def clock_do_anim_node(self, *args) -> None:
         self.anim_function(self.selected_node)
@@ -525,15 +516,10 @@ A pipeline editor and playback viewer for PeekingDuck
             return
         print("btn_node_delete")
         if self.selected_node:
-            # idx = int(self.selected_node.node_number) - 1
-            # vanish_widget(self.selected_node)
             shake_widget(self.selected_node)
-            if self._sound_on:
-                self._snd_delete_node.play()
-            # self.anim_function = vanish_widget
+            if self.sounds.sound_on:
+                self.sounds.snd_delete_node.play()
             Clock.schedule_once(self.clock_do_delete_node, 1.0)
-            # self.pipeline_controller.delete_node(idx)
-            # self.selected_node = None
         else:
             print("nothing selected to delete")
 

@@ -3,7 +3,7 @@
 #
 
 from typing import List
-from gui_widgets import NodeConfig
+from gui_widgets import NodeConfig, Sounds
 from gui_utils import NODE_RGBA_COLOR, BLACK, WHITE, NAVY, shake_widget
 from config_parser import (
     NODE_CONFIG_READONLY_KEYS,
@@ -21,7 +21,7 @@ NODE_TEXT_INPUT_DELAY = 0.5  # half second
 
 
 class ConfigController:
-    def __init__(self, config_parser, pipeline_view, mixer) -> None:
+    def __init__(self, config_parser, pipeline_view, sounds: Sounds) -> None:
         self.pipeline_view = pipeline_view
         self.config_header = pipeline_view.ids["pipeline_config_header"]
         self.pipeline_config = pipeline_view.ids["pipeline_config"]
@@ -29,8 +29,7 @@ class ConfigController:
         self.config_parser: NodeConfigParser = config_parser
         self.pipeline_model: ModelPipeline = None
         self.overlay: BoxLayout = None
-        self._mixer = mixer
-        self._snd_slash = mixer.Sound("sounds/slash-21834.mp3")
+        self.sounds = sounds
 
     def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         """Cache ModelPipeline object within self and init node type spinner values
@@ -72,7 +71,8 @@ class ConfigController:
 
         if key in NODE_CONFIG_READONLY_KEYS:
             shake_widget(instance)
-            self._snd_slash.play()
+            if self.sounds.sound_on:
+                self.sounds.snd_error.play()
             return
         if self.overlay:
             print("overlay present, exiting")

@@ -18,6 +18,7 @@ from kivy.uix.label import Label
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.screenmanager import Screen
 from kivy.uix.slider import Slider
+from pygame import mixer
 
 from typing import List
 from gui_utils import get_node_color, NAVY
@@ -186,3 +187,24 @@ class MsgBox:
         popup.message.text = self._msg
         popup.close_button.text = self._btn_close_text
         popup.open()
+
+
+class Sounds:
+    def __init__(self) -> None:
+        self._sound_on = False
+        self._mixer = mixer
+        self._mixer.init()
+        self.load_sounds()
+
+    @property
+    def sound_on(self) -> bool:
+        return self._sound_on
+
+    @sound_on.setter
+    def sound_on(self, flag: bool) -> None:
+        self._sound_on = flag
+
+    def load_sounds(self):
+        self.snd_add_node = mixer.Sound("sounds/message-ringtone-21467.mp3")
+        self.snd_delete_node = mixer.Sound("sounds/chew-21768.mp3")
+        self.snd_error = mixer.Sound("sounds/slash-21834.mp3")
