@@ -205,6 +205,21 @@ class Sounds:
         self._sound_on = flag
 
     def load_sounds(self):
-        self.snd_add_node = mixer.Sound("sounds/message-ringtone-21467.mp3")
-        self.snd_delete_node = mixer.Sound("sounds/chew-21768.mp3")
-        self.snd_error = mixer.Sound("sounds/slash-21834.mp3")
+        # self._snd_add_node = mixer.Sound("sounds/message-ringtone-21467.mp3")
+        self._snd_add_node = mixer.Sound("sounds/stop-13692.mp3")
+        self._snd_delete_node = mixer.Sound(
+            "sounds/rapid-wind-sound-effect-1-108398.mp3"
+        )
+        self._snd_error = mixer.Sound("sounds/buzzer.mp3")
+        self._snd_about = mixer.Sound("sounds/winter-holiday-logo-14033.mp3")
+        self._sound_map = {
+            "add_note": self._snd_add_node,
+            "delete_note": self._snd_delete_node,
+            "error": self._snd_error,
+            "about": self._snd_about,
+        }
+
+    def play(self, sound: str):
+        if self.sound_on:
+            if sound in self._sound_map:
+                self._sound_map[sound].play()

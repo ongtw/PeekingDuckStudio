@@ -70,9 +70,8 @@ class ConfigController:
         print(f"key: {key}, val: {val}, overlay: {overlay.pos} {overlay.size}")
 
         if key in NODE_CONFIG_READONLY_KEYS:
+            self.sounds.play("error")
             shake_widget(instance)
-            if self.sounds.sound_on:
-                self.sounds.snd_error.play()
             return
         if self.overlay:
             print("overlay present, exiting")

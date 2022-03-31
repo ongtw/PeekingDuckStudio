@@ -370,6 +370,7 @@ by David Ong Tat-Wee
 A pipeline editor and playback viewer for PeekingDuck
         """
         msgbox = MsgBox(title, msg, "Ok")
+        self.sounds.play("about")
         msgbox.show()
 
     def btn_quit(self, btn) -> None:
@@ -502,8 +503,7 @@ A pipeline editor and playback viewer for PeekingDuck
         self.btn_node_press(gui_node)
         self.anim_function = shake_widget
         Clock.schedule_once(self.clock_do_anim_node, 0.2)
-        if self.sounds.sound_on:
-            self.sounds.snd_add_node.play()
+        self.sounds.play("add_note")
 
     def clock_do_anim_node(self, *args) -> None:
         self.anim_function(self.selected_node)
@@ -517,8 +517,7 @@ A pipeline editor and playback viewer for PeekingDuck
         print("btn_node_delete")
         if self.selected_node:
             shake_widget(self.selected_node)
-            if self.sounds.sound_on:
-                self.sounds.snd_delete_node.play()
+            self.sounds.play("delete_note")
             Clock.schedule_once(self.clock_do_delete_node, 1.0)
         else:
             print("nothing selected to delete")
@@ -526,7 +525,7 @@ A pipeline editor and playback viewer for PeekingDuck
     def clock_do_delete_node(self, *args) -> None:
         idx = int(self.selected_node.node_number) - 1
         self.pipeline_controller.delete_node(idx)
-        self.selected_node = None
+        self.clear_selected_nodes()
 
     def btn_node_move_up_press(self, *args) -> None:
         if self.all_selected_nodes:
