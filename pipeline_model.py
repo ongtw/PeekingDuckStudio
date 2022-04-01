@@ -159,6 +159,40 @@ class ModelPipeline:
         node = self._idx_to_node[i]
         return node
 
+    def get_string_representation(self, node_list: List[ModelNode] = None) -> str:
+        """Return JSON string representation for given list of ModelNodes.
+        This string can be parsed by PeekingDuck.
+
+        Args:
+            node_list (List[ModelNode]): given list of ModelNodes
+
+        Returns:
+            str: their JSON string representation
+        """
+        if node_list is None:
+            node_list = self.node_list
+
+        pipeline_nodes = []
+
+        for node in node_list:
+            node_title = node.node_title
+            user_config = node.user_config
+            print(f"{node_title} -> {user_config}")
+
+            if "None" in user_config[0]:
+                # print(f"append {node_title}")
+                pipeline_nodes.append(node_title)
+            else:
+                configs = {k: v for dd in user_config for k, v in dd.items()}
+                node_dict = {node_title: configs}
+                # print(f"append {node_dict}")
+                pipeline_nodes.append(node_dict)
+
+        pipeline = {"nodes": pipeline_nodes}
+        res = f"{pipeline}"
+        print("run pipeline:", res)
+        return res
+
     def load_pipeline(self, pipeline_path: str) -> None:
         """Load pipeline file in given path
 

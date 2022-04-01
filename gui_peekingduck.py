@@ -14,15 +14,17 @@
 # - edit config: present type-based options when setting values
 # - output: playback speed?
 # - export output as video file
-# - pipeline: save
+# - confirmation before any operation that destroys unsaved pipeline
+# - tooltips
+# - user preferences/app config: default folder, etc.
 # - pipeline: error check
-# - pipeline: multiple select(?)
+# - pipeline: multiple select (for move / delete)
 # - anomalous pipelines:
 #   * duplicate nodes
 #   * multiple nodes of same type (any allowed combo?)
-# - garbage collect old video frames (need to?)
 # - undo/redo
-# - app config: default folder, etc.
+# - convert unicode glyphs to images (for cross platform consistency?)
+# - garbage collect old video frames (need to?)
 
 ##########
 # Globals
@@ -41,6 +43,8 @@ PLAYBACK_DELAY = 0.01
 ##########
 from kivy.config import Config
 
+from kivy.metrics import Metrics
+
 # change window size from 800x600 to 1024x768 (must be before other kivy modules)
 Config.set("graphics", "width", WIN_WIDTH)
 Config.set("graphics", "height", WIN_HEIGHT)
@@ -56,6 +60,8 @@ from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
 
 import os
+import json
+import yaml
 from typing import List
 from gui_utils import (
     NODE_COLOR_SELECTED,
@@ -66,6 +72,7 @@ from gui_utils import (
 )
 from gui_widgets import (
     FileLoadDialog,
+    FileSaveDialog,
     MsgBox,
     Node,
     ScreenPipeline,
@@ -314,47 +321,6 @@ class PeekingDuckGuiApp(App):
     #
     # Main app buttons
     #
-    def btn_new_file(self, btn) -> None:
-        """Start a new pipeline
-
-        Args:
-            btn (Button): the New button
-        """
-        print("btn_new_file")
-        self.filename = "new_pipeline.yml"
-        self.project_info.filename = self.filename
-        self.pipeline_model = ModelPipeline()
-        self._do_begin_pipeline()
-
-    def btn_load_file(self, btn) -> None:
-        """Show FileChooser for user to load a pipeline file
-
-        Args:
-            btn (Buton): the Load button
-        """
-        file_dialog = FileLoadDialog(select=self.load_file, cancel=self.cancel_load)
-        file_dialog.setup(root_path=ROOT_PATH, path=CURR_PATH, filters=FILE_FILTERS)
-        self._file_dialog = Popup(
-            title="Load File", content=file_dialog, size_hint=(0.75, 0.75)
-        )
-        self._file_dialog.open()
-
-    def btn_save_file(self, btn) -> None:
-        print("btn_save_file: not implemented yet")
-
-    def btn_sound_on_off(self, btn) -> None:
-        """Toggle sound on/off
-
-        Args:
-            btn (Button): the Sound On/Off button
-        """
-        parent = btn.parent
-        print(f"btn_sound_on_off: tag={parent.tag}")
-        # self._sound_on = not self._sound_on
-        # parent.tag = "on" if self._sound_on else "off"
-        self.sounds.sound_on = not self.sounds.sound_on
-        parent.tag = "on" if self.sounds.sound_on else "off"
-
     def btn_about(self, btn) -> None:
         """Show About this Program dialog box
 
@@ -363,11 +329,14 @@ class PeekingDuckGuiApp(App):
         """
         title = "About PeekingDuck GUI"
         msg = """
-PeekingDuck GUI
+PeekingDuck GUI v1.0
 by David Ong Tat-Wee
 (C) 2022
 
 A pipeline editor and playback viewer for PeekingDuck
+
+
+A multiple-nights/weekends project using Python and Kivy
         """
         msgbox = MsgBox(title, msg, "Ok")
         self.sounds.play("about")
@@ -382,7 +351,110 @@ A pipeline editor and playback viewer for PeekingDuck
         # todo: ask user to confirm quit / save changes
         self.stop()
 
-    def cancel_load(self) -> None:
+    def btn_load_file(self, btn) -> None:
+        """Show FileChooser for user to load a pipeline file
+
+        Args:
+            btn (Buton): the Load button
+        """
+        file_dialog = FileLoadDialog(
+            select=self.load_file, cancel=self.cancel_file_dialog
+        )
+        file_dialog.setup(root_path=ROOT_PATH, path=CURR_PATH, filters=FILE_FILTERS)
+        self._file_dialog = Popup(
+            title="Load File", content=file_dialog, size_hint=(0.75, 0.75)
+        )
+        self._file_dialog.open()
+
+    def btn_new_file(self, btn) -> None:
+        """Start a new pipeline
+
+        Args:
+            btn (Button): the New button
+        """
+        print("btn_new_file")
+        self.filename = "new_pipeline.yml"
+        self.project_info.filename = self.filename
+        self.pipeline_model = ModelPipeline()
+        self._do_begin_pipeline()
+
+    def btn_save_file(self, btn) -> None:
+        if self.pipeline_model:
+            file_dialog = FileSaveDialog(
+                save=self.save_file, cancel=self.cancel_file_dialog
+            )
+            file_dialog.setup(
+                root_path=ROOT_PATH,
+                path=CURR_PATH,
+                filters=FILE_FILTERS,
+                filename=self.filename,
+            )
+            self._file_dialog = Popup(
+                title="Load File", content=file_dialog, size_hint=(0.75, 0.75)
+            )
+            self._file_dialog.open()
+        else:
+            msgbox = MsgBox(
+                "File Save Alert", "No pipeline to save. Please create one first.", "Ok"
+            )
+            msgbox.show()
+
+    def btn_sound_on_off(self, btn) -> None:
+        """Toggle sound on/off
+
+        Args:
+            btn (Button): the Sound On/Off button
+        """
+        parent = btn.parent
+        print(f"btn_sound_on_off: tag={parent.tag}")
+        # self._sound_on = not self._sound_on
+        # parent.tag = "on" if self._sound_on else "off"
+        self.sounds.sound_on = not self.sounds.sound_on
+        parent.tag = "on" if self.sounds.sound_on else "off"
+
+    def clean_json(self, json_str: str) -> str:
+        # dotw: quick hack, to properly replace single and double quotes
+        # replace " with ``
+        cleaned = json_str.replace('"', "`")
+        # replace ' with "
+        cleaned = cleaned.replace("'", '"')
+        # replace `` with '
+        cleaned = cleaned.replace("`", "'")
+        return cleaned
+
+    def btn_yaml(self, btn) -> None:
+        """Show pipeline's yaml source code
+
+        Args:
+            btn (_type_): the Yaml button
+        """
+        if self.pipeline_model:
+            json_str = self.pipeline_model.get_string_representation()
+            print(f"json_str: {json_str}")
+            clean_json_str = self.clean_json(json_str)
+            print(f"clean_json_str: {clean_json_str}")
+            dd = json.loads(clean_json_str)
+            print(f"dd: {type(dd)} {dd}")
+            ss = yaml.dump(dd, default_flow_style=None)
+            print(f"ss: {ss}")
+
+            msgbox = MsgBox(
+                "Yaml Source Code",
+                ss,
+                "Ok",
+                font_name="Courier New",
+                font_size=18 * Metrics.dp,
+            )
+            msgbox.show()
+        else:
+            msgbox = MsgBox(
+                "PeekingDuck GUI Alert",
+                "No pipeline to display. Please create one first.",
+                "Ok",
+            )
+            msgbox.show()
+
+    def cancel_file_dialog(self) -> None:
         """Called when user clicks 'Cancel' in Load File dialog
         Will close the Load File dialog.
         """
@@ -484,6 +556,20 @@ A pipeline editor and playback viewer for PeekingDuck
         self.output_controller.set_output_header(self.filename)
         self.pipeline_controller.set_pipeline_model(self.pipeline_model)
         self.pipeline_controller.draw_nodes()
+
+    def save_file(self, path: str, file_paths: List[str]) -> None:
+        self._file_dialog.dismiss()
+        full_path = f"{path}/{file_paths}"
+        print("save_file")
+        print(f"  path: {path}, file_paths: {file_paths}")
+        print(f"  full_path: {full_path}")
+        json_str = self.pipeline_model.get_string_representation()
+        clean_json_str = self.clean_json(json_str)
+        dd = json.loads(clean_json_str)
+        with open(full_path, "w") as outfile:
+            yaml.dump(dd, outfile, default_flow_style=None)
+        msgbox = MsgBox("PeekingDuck GUI Alert", f"File saved to {full_path}", "Ok")
+        msgbox.show()
 
     #####################
     # Pipeline processing

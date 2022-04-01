@@ -44,6 +44,20 @@ class FileLoadDialog(FloatLayout):
         file_chooser.filters = filters
 
 
+class FileSaveDialog(FloatLayout):
+    save = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+    text_input = ObjectProperty(None)
+
+    def setup(self, root_path: str, path: str, filters: List[str], filename: str):
+        self.text_input.text = filename
+        # dotw: weakref, cannot use python with statement
+        file_chooser = self.ids["id_file_chooser"]
+        file_chooser.rootpath = root_path
+        file_chooser.path = path
+        file_chooser.filters = filters
+
+
 class Node(GridLayout):
     bkgd_color = ListProperty([0, 0, 1, 1])
     select_color = ListProperty([0, 0, 0, 0])
@@ -176,14 +190,25 @@ class ScreenPlayback(Screen):
 class MsgBox:
     """Custom dialog box class for messages"""
 
-    def __init__(self, title: str, msg: str, btn_close_text: str) -> None:
+    def __init__(
+        self,
+        title: str,
+        msg: str,
+        btn_close_text: str,
+        font_name: str = "Arial",
+        font_size: int = 15,
+    ) -> None:
         self._title = title
         self._msg = msg
         self._btn_close_text = btn_close_text
+        self._font_name = font_name
+        self._font_size = font_size
 
     def show(self) -> None:
         popup = Factory.MsgBoxPopup()
         popup.title = self._title
+        popup.font_name = self._font_name
+        popup.font_size = self._font_size
         popup.message.text = self._msg
         popup.close_button.text = self._btn_close_text
         popup.open()
@@ -205,7 +230,6 @@ class Sounds:
         self._sound_on = flag
 
     def load_sounds(self):
-        # self._snd_add_node = mixer.Sound("sounds/message-ringtone-21467.mp3")
         self._snd_add_node = mixer.Sound("sounds/stop-13692.mp3")
         self._snd_delete_node = mixer.Sound(
             "sounds/rapid-wind-sound-effect-1-108398.mp3"

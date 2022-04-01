@@ -73,9 +73,7 @@ class OutputController:
             self.set_play_stop_btn_to_stop()
             if self.pipeline_model.dirty:
                 # play modified pipeline
-                pipeline_str = self.config_parser.get_string_representation(
-                    self.pipeline_model.node_list
-                )
+                pipeline_str = self.pipeline_model.get_string_representation()
                 self.run_pipeline_start(pipeline_str)
             else:
                 # play last unmodified pipeline

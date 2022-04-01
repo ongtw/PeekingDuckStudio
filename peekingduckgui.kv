@@ -57,6 +57,8 @@
     close_button: butt
     message: message
     auto_dismiss: False
+    font_name: "Arial"
+    font_size: sp(15)
     title: "MsgBox"
     size_hint: None, None
     width: grid.width + dp(25)
@@ -76,6 +78,8 @@
             width: max(message.width, butt.width)
             Label: 
                 id: message
+                font_name: root.font_name
+                font_size: root.font_size
                 size_hint: None, None
                 size: self.texture_size
                 padding: [10, 5]
@@ -111,18 +115,56 @@
         size: root.size
         pos: root.pos
         file_chooser: id_file_chooser.__self__
+        Label:
+            text: id_file_chooser.path
+            size_hint_y: None
+            height: sp(30)
+        Separator:
+            direction: "horizontal"
+            line_color: SILVER
         FileChooserListView:
             id: id_file_chooser
             dirselect: True
         BoxLayout:
             size_hint_y: None
-            height: 30
+            height: sp(30)
             Button:
                 text: "Cancel"
                 on_release: root.cancel()
             Button:
                 text: "Select"
                 on_release: root.select(id_file_chooser.path, id_file_chooser.selection)
+
+<FileSaveDialog>:
+    text_input: text_input
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        Label:
+            text: id_file_chooser.path
+            size_hint_y: None
+            height: sp(30)
+        Separator:
+            direction: "horizontal"
+            line_color: SILVER
+        FileChooserListView:
+            id: id_file_chooser
+            on_selection: text_input.text = self.selection and self.selection[0] or ''
+        TextInput:
+            id: text_input
+            size_hint_y: None
+            height: sp(30)
+            multiline: False
+        BoxLayout:
+            size_hint_y: None
+            height: sp(30)
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+            Button:
+                text: "Save"
+                on_release: root.save(id_file_chooser.path, text_input.text)
 
 <Header@BoxLayout>:
     font_color: 1, 1, 1, 1
@@ -426,6 +468,12 @@
     padding: 6
     spacing: 10
     RoundedButton:
+        text: "Yaml"
+        callback_press: app.btn_yaml
+    Separator:
+        line_color: GUI_COLOR
+        width: dp(1)
+    RoundedButton:
         text: "New"
         callback_press: app.btn_new_file
     RoundedButton:
@@ -437,6 +485,9 @@
     RoundedButton:
         text: "Run"
         callback_press: app.btn_goto_screen_playback
+    Separator:
+        line_color: GUI_COLOR
+        width: dp(1)
     RoundedButton:
         tag: "off"
         text: "No " + NOTES if self.tag == "off" else NOTES
