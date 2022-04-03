@@ -9,6 +9,7 @@ import yaml
 
 EMPTY_NODE = "augment.brightness"
 NO_USER_CONFIG = [{"None": "No Config"}]
+DEFAULT_URL = "https://storage.googleapis.com/peekingduck/videos/wave.mp4"
 
 
 class ModelNode:
@@ -91,7 +92,7 @@ class ModelPipeline:
         else:
             basic_pipeline = {
                 "nodes": [
-                    {"input.visual": {"source": 0}},
+                    {"input.visual": {"source": DEFAULT_URL}},
                     "model.posenet",
                     "draw.poses",
                     "output.screen",
@@ -381,7 +382,7 @@ def main():
     """Quick and dirty test of ModelPipeline and ModelNodes"""
     data = {
         "nodes": [
-            {"input.visual": {"source": 0}},
+            {"input.visual": {"source": 0}},  # use webcam for testing
             {"model.yolo": {"model_type": "v4"}},
             "draw.bbox",
             "output.screen",
