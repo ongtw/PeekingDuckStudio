@@ -3,25 +3,25 @@
 #
 
 from typing import List
-from gui_widgets import NodeConfig, Sounds
-from gui_utils import NODE_RGBA_COLOR, BLACK, WHITE, NAVY, shake_widget
-from config_parser import (
-    NODE_CONFIG_READONLY_KEYS,
-    NODE_CONFIG_RESERVED_KEYS,
-    NodeConfigParser,
-)
-from pipeline_model import ModelPipeline
 from kivy.clock import Clock
 from kivy.metrics import Metrics
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 import ast
+from peekingduck_gui.gui_widgets import NodeConfig
+from peekingduck_gui.gui_utils import NODE_RGBA_COLOR, BLACK, WHITE, NAVY, shake_widget
+from peekingduck_gui.config_parser import (
+    NODE_CONFIG_READONLY_KEYS,
+    NODE_CONFIG_RESERVED_KEYS,
+    NodeConfigParser,
+)
+from peekingduck_gui.pipeline_model import ModelPipeline
 
 NODE_TEXT_INPUT_DELAY = 0.5  # half second
 
 
 class ConfigController:
-    def __init__(self, config_parser, pipeline_view, sounds: Sounds) -> None:
+    def __init__(self, config_parser, pipeline_view) -> None:
         self.pipeline_view = pipeline_view
         self.config_header = pipeline_view.ids["pipeline_config_header"]
         self.pipeline_config = pipeline_view.ids["pipeline_config"]
@@ -29,7 +29,6 @@ class ConfigController:
         self.config_parser: NodeConfigParser = config_parser
         self.pipeline_model: ModelPipeline = None
         self.overlay: BoxLayout = None
-        self.sounds = sounds
 
     def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         """Cache ModelPipeline object within self and init node type spinner values
@@ -70,7 +69,6 @@ class ConfigController:
         print(f"key: {key}, val: {val}, overlay: {overlay.pos} {overlay.size}")
 
         if key in NODE_CONFIG_READONLY_KEYS:
-            self.sounds.play("error")
             shake_widget(instance)
             return
         if self.overlay:

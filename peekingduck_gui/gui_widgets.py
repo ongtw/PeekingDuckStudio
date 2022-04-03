@@ -18,10 +18,8 @@ from kivy.uix.label import Label
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.screenmanager import Screen
 from kivy.uix.slider import Slider
-from pygame import mixer
-
 from typing import List
-from gui_utils import get_node_color, NAVY
+from peekingduck_gui.gui_utils import get_node_color, NAVY
 
 SINGLE_TAP_DELAY = 0.25
 
@@ -212,38 +210,3 @@ class MsgBox:
         popup.message.text = self._msg
         popup.close_button.text = self._btn_close_text
         popup.open()
-
-
-class Sounds:
-    def __init__(self) -> None:
-        self._sound_on = False
-        self._mixer = mixer
-        self._mixer.init()
-        self.load_sounds()
-
-    @property
-    def sound_on(self) -> bool:
-        return self._sound_on
-
-    @sound_on.setter
-    def sound_on(self, flag: bool) -> None:
-        self._sound_on = flag
-
-    def load_sounds(self):
-        self._snd_add_node = mixer.Sound("sounds/stop-13692.mp3")
-        self._snd_delete_node = mixer.Sound(
-            "sounds/rapid-wind-sound-effect-1-108398.mp3"
-        )
-        self._snd_error = mixer.Sound("sounds/buzzer.mp3")
-        self._snd_about = mixer.Sound("sounds/winter-holiday-logo-14033.mp3")
-        self._sound_map = {
-            "add_note": self._snd_add_node,
-            "delete_note": self._snd_delete_node,
-            "error": self._snd_error,
-            "about": self._snd_about,
-        }
-
-    def play(self, sound: str):
-        if self.sound_on:
-            if sound in self._sound_map:
-                self._sound_map[sound].play()

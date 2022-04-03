@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 import peekingduck
 import yaml
 from pathlib import Path
-from pipeline_model import ModelNode
+from peekingduck_gui.pipeline_model import ModelNode
 
 NODE_CONFIG_READONLY_KEYS = {"input", "output", "model_size"}
 NODE_CONFIG_RESERVED_KEYS = {"MODEL_NODES", "weights", "weights_parent_dir"}

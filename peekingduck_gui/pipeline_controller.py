@@ -3,10 +3,10 @@
 #
 
 from typing import List, Union
-from gui_utils import NODE_COLOR_SELECTED
-from gui_widgets import Node
-from config_parser import NodeConfigParser
-from pipeline_model import ModelNode, ModelPipeline
+from peekingduck_gui.gui_utils import NODE_COLOR_SELECTED
+from peekingduck_gui.gui_widgets import Node
+from peekingduck_gui.config_parser import NodeConfigParser
+from peekingduck_gui.pipeline_model import ModelNode, ModelPipeline
 
 
 class PipelineController:

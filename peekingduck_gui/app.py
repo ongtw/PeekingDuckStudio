@@ -63,27 +63,26 @@ import os
 import json
 import yaml
 from typing import List
-from gui_utils import (
+from peekingduck_gui.gui_utils import (
     NODE_COLOR_SELECTED,
     NODE_COLOR_CLEAR,
     CONFIG_COLOR_SELECTED,
     CONFIG_COLOR_CLEAR,
     shake_widget,
 )
-from gui_widgets import (
+from peekingduck_gui.gui_widgets import (
     FileLoadDialog,
     FileSaveDialog,
     MsgBox,
     Node,
     ScreenPipeline,
     ScreenPlayback,
-    Sounds,
 )
-from config_parser import NodeConfigParser
-from config_controller import ConfigController
-from output_controller import OutputController
-from pipeline_controller import PipelineController
-from pipeline_model import ModelPipeline
+from peekingduck_gui.config_parser import NodeConfigParser
+from peekingduck_gui.config_controller import ConfigController
+from peekingduck_gui.output_controller import OutputController
+from peekingduck_gui.pipeline_controller import PipelineController
+from peekingduck_gui.pipeline_model import ModelPipeline
 
 
 class PeekingDuckGuiApp(App):
@@ -108,11 +107,10 @@ class PeekingDuckGuiApp(App):
         self.all_selected_configs = set()
         self.setup_key_widgets()
         self.setup_gui_working_vars()
-        self.sounds = Sounds()
 
         self.config_parser = NodeConfigParser()
         self.config_controller = ConfigController(
-            self.config_parser, self.pipeline_view, self.sounds
+            self.config_parser, self.pipeline_view
         )
         self.output_controller = OutputController(self.config_parser, self.pkd_view)
         self.pipeline_controller = PipelineController(
@@ -339,7 +337,6 @@ A pipeline editor and playback viewer for PeekingDuck
 A multiple-nights/weekends project using Python and Kivy
         """
         msgbox = MsgBox(title, msg, "Ok")
-        self.sounds.play("about")
         msgbox.show()
 
     def btn_quit(self, btn) -> None:
@@ -407,10 +404,6 @@ A multiple-nights/weekends project using Python and Kivy
         """
         parent = btn.parent
         print(f"btn_sound_on_off: tag={parent.tag}")
-        # self._sound_on = not self._sound_on
-        # parent.tag = "on" if self._sound_on else "off"
-        self.sounds.sound_on = not self.sounds.sound_on
-        parent.tag = "on" if self.sounds.sound_on else "off"
 
     def clean_json(self, json_str: str) -> str:
         # dotw: quick hack, to properly replace single and double quotes
@@ -589,7 +582,6 @@ A multiple-nights/weekends project using Python and Kivy
         self.btn_node_press(gui_node)
         self.anim_function = shake_widget
         Clock.schedule_once(self.clock_do_anim_node, 0.2)
-        self.sounds.play("add_note")
 
     def clock_do_anim_node(self, *args) -> None:
         self.anim_function(self.selected_node)
@@ -603,7 +595,6 @@ A multiple-nights/weekends project using Python and Kivy
         print("btn_node_delete")
         if self.selected_node:
             shake_widget(self.selected_node)
-            self.sounds.play("delete_note")
             Clock.schedule_once(self.clock_do_delete_node, 1.0)
         else:
             print("nothing selected to delete")
