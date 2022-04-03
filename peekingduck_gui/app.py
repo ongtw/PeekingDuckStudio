@@ -29,8 +29,9 @@
 ##########
 # Globals
 ##########
-ROOT_PATH = "/Users/dotw"
-CURR_PATH = "/Users/dotw/src/pkd/car_project"
+ROOT_PATH = "/"
+CURR_PATH = ROOT_PATH
+print(f"root_path={ROOT_PATH}")
 DIR_FILTERS = [""]
 FILE_FILTERS = ["*.yml"]
 WIN_WIDTH = 1280
@@ -42,7 +43,6 @@ PLAYBACK_DELAY = 0.01
 # Imports
 ##########
 from kivy.config import Config
-
 from kivy.metrics import Metrics
 
 # change window size from 800x600 to 1024x768 (must be before other kivy modules)
