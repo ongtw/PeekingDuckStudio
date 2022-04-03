@@ -203,10 +203,16 @@ class PeekingDuckGuiApp(App):
         self.sm.current = "screen_pipeline"
 
     def btn_goto_screen_playback(self, *args) -> None:
-        """Transition left to playback screen"""
-        self.sm.transition.direction = "left"
-        self.sm.current = "screen_playback"
-        self.screen_playback.bind(on_enter=self.auto_play_once)
+        if self.pipeline_model:
+            """Transition left to playback screen"""
+            self.sm.transition.direction = "left"
+            self.sm.current = "screen_playback"
+            self.screen_playback.bind(on_enter=self.auto_play_once)
+        else:
+            msgbox = MsgBox(
+                "Alert", "No pipeline to run. Please create one first.", "Ok"
+            )
+            msgbox.show()
 
     def auto_play_once(self, *args) -> None:
         """Autostart playback upon entering playback screen"""
