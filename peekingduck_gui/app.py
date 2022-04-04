@@ -7,7 +7,9 @@
 # - runtime no exception nor stderr, but stdout has error msg
 #   e.g. move dabble.bbox_count to last node and run pipeline
 #   -> no error dialog displayed so user doesn't know what happened
+# - weights download sends output to stderr, code thinks it's an error
 # Todo list:
+# - ROOT_PATH to be set properly to /Users for all platforms
 # - support custom nodes definition
 # - edit config: value range check
 # - edit config: value type check
