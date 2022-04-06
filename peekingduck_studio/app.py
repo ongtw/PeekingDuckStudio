@@ -1,13 +1,18 @@
 #
-# PeekingDuck GUI
+# PeekingDuck Studio
 # DOTW, (C) 2022
 #
 
+#
 # Bug list:
 # - runtime no exception nor stderr, but stdout has error msg
 #   e.g. move dabble.bbox_count to last node and run pipeline
 #   -> no error dialog displayed so user doesn't know what happened
 # - weights download sends output to stderr, code thinks it's an error
+#
+# Features:
+# - add performance evaluation support
+#
 # Todo list:
 # - ROOT_PATH to be set properly to /Users for all platforms
 # - support custom nodes definition
@@ -65,14 +70,14 @@ import os
 import json
 import yaml
 from typing import List
-from peekingduck_gui.gui_utils import (
+from peekingduck_studio.gui_utils import (
     NODE_COLOR_SELECTED,
     NODE_COLOR_CLEAR,
     CONFIG_COLOR_SELECTED,
     CONFIG_COLOR_CLEAR,
     shake_widget,
 )
-from peekingduck_gui.gui_widgets import (
+from peekingduck_studio.gui_widgets import (
     FileLoadDialog,
     FileSaveDialog,
     MsgBox,
@@ -80,19 +85,19 @@ from peekingduck_gui.gui_widgets import (
     ScreenPipeline,
     ScreenPlayback,
 )
-from peekingduck_gui.config_parser import NodeConfigParser
-from peekingduck_gui.config_controller import ConfigController
-from peekingduck_gui.output_controller import OutputController
-from peekingduck_gui.pipeline_controller import PipelineController
-from peekingduck_gui.pipeline_model import ModelPipeline
+from peekingduck_studio.config_parser import NodeConfigParser
+from peekingduck_studio.config_controller import ConfigController
+from peekingduck_studio.output_controller import OutputController
+from peekingduck_studio.pipeline_controller import PipelineController
+from peekingduck_studio.pipeline_model import ModelPipeline
 
 
-class PeekingDuckGuiApp(App):
+class PeekingDuckStudioApp(App):
     def build(self):
         """
         Main Kivy application entry point
         """
-        self.title = "PeekingDuck GUI"
+        self.title = "PeekingDuck Studio"
 
         sm = ScreenManager()
         self.screen_pipeline = ScreenPipeline(name="screen_pipeline")
@@ -333,9 +338,9 @@ class PeekingDuckGuiApp(App):
         Args:
             btn (Button): the About button
         """
-        title = "About PeekingDuck GUI"
+        title = "About PeekingDuck Studio"
         msg = """
-PeekingDuck GUI v1.0
+PeekingDuck Studio v1.0
 by David Ong Tat-Wee
 (C) 2022
 
@@ -348,7 +353,7 @@ A multiple-nights/weekends project using Python and Kivy
         msgbox.show()
 
     def btn_quit(self, btn) -> None:
-        """Stop and quit PeekingDuck GUI application
+        """Stop and quit PeekingDuck Studio application
 
         Args:
             btn (Button): the Quit button
@@ -449,7 +454,7 @@ A multiple-nights/weekends project using Python and Kivy
             msgbox.show()
         else:
             msgbox = MsgBox(
-                "PeekingDuck GUI Alert",
+                "Alert",
                 "No pipeline to display. Please create one first.",
                 "Ok",
             )
@@ -569,7 +574,7 @@ A multiple-nights/weekends project using Python and Kivy
         dd = json.loads(clean_json_str)
         with open(full_path, "w") as outfile:
             yaml.dump(dd, outfile, default_flow_style=None)
-        msgbox = MsgBox("PeekingDuck GUI Alert", f"File saved to {full_path}", "Ok")
+        msgbox = MsgBox("Alert", f"File saved to {full_path}", "Ok")
         msgbox.show()
 
     #####################
@@ -660,4 +665,4 @@ A multiple-nights/weekends project using Python and Kivy
 
 
 if __name__ == "__main__":
-    PeekingDuckGuiApp().run()
+    PeekingDuckStudioApp().run()

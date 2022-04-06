@@ -1,5 +1,5 @@
 #
-# PeekingDuck GUI General Utilities
+# PeekingDuck Studio General Utilities
 #
 from turtle import left
 from typing import Tuple

@@ -1,3 +1,3 @@
-from peekingduck_gui.app import PeekingDuckGuiApp
+from peekingduck_studio.app import PeekingDuckStudioApp
 
-PeekingDuckGuiApp().run()
+PeekingDuckStudioApp().run()

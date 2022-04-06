@@ -19,7 +19,7 @@ from kivy.uix.progressbar import ProgressBar
 from kivy.uix.screenmanager import Screen
 from kivy.uix.slider import Slider
 from typing import List
-from peekingduck_gui.gui_utils import get_node_color, NAVY
+from peekingduck_studio.gui_utils import get_node_color, NAVY
 
 SINGLE_TAP_DELAY = 0.25
 

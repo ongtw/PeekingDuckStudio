@@ -1,5 +1,5 @@
 #
-# PeekingDuck GUI Controller for Node Config
+# PeekingDuck Studio Controller for Node Config
 #
 
 from typing import List
@@ -8,14 +8,20 @@ from kivy.metrics import Metrics
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 import ast
-from peekingduck_gui.gui_widgets import NodeConfig
-from peekingduck_gui.gui_utils import NODE_RGBA_COLOR, BLACK, WHITE, NAVY, shake_widget
-from peekingduck_gui.config_parser import (
+from peekingduck_studio.gui_widgets import NodeConfig
+from peekingduck_studio.gui_utils import (
+    NODE_RGBA_COLOR,
+    BLACK,
+    WHITE,
+    NAVY,
+    shake_widget,
+)
+from peekingduck_studio.config_parser import (
     NODE_CONFIG_READONLY_KEYS,
     NODE_CONFIG_RESERVED_KEYS,
     NodeConfigParser,
 )
-from peekingduck_gui.pipeline_model import ModelPipeline
+from peekingduck_studio.pipeline_model import ModelPipeline
 
 NODE_TEXT_INPUT_DELAY = 0.5  # half second
 

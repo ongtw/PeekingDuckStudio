@@ -1,5 +1,5 @@
 #
-# PeekingDuck GUI Model for Pipeline
+# PeekingDuck Studio Model for Pipeline
 #
 
 from re import U

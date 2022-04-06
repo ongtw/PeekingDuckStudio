@@ -1,0 +1,1 @@
+from peekingduck_studio.version import __version__

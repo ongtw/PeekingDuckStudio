@@ -1,5 +1,5 @@
-PeekingDuck GUI Technotes
-=========================
+PeekingDuck Studio Technotes
+============================
 
 Features:
 1. load, edit, save pipeline

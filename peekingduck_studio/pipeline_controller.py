@@ -1,12 +1,12 @@
 #
-# PeekingDuck GUI Controller for Pipeline Nodes
+# PeekingDuck Studio Controller for Pipeline Nodes
 #
 
 from typing import List, Union
-from peekingduck_gui.gui_utils import NODE_COLOR_SELECTED
-from peekingduck_gui.gui_widgets import Node
-from peekingduck_gui.config_parser import NodeConfigParser
-from peekingduck_gui.pipeline_model import ModelNode, ModelPipeline
+from peekingduck_studio.gui_utils import NODE_COLOR_SELECTED
+from peekingduck_studio.gui_widgets import Node
+from peekingduck_studio.config_parser import NodeConfigParser
+from peekingduck_studio.pipeline_model import ModelNode, ModelPipeline
 
 
 class PipelineController:

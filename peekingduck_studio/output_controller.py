@@ -1,5 +1,5 @@
 #
-# PeekingDuck GUI Controller for Output Playback
+# PeekingDuck Studio Controller for Output Playback
 #
 
 from contextlib import redirect_stderr, redirect_stdout
@@ -13,9 +13,9 @@ from kivy.graphics.texture import Texture
 from tempfile import TemporaryDirectory
 from peekingduck.declarative_loader import DeclarativeLoader
 from peekingduck.pipeline.pipeline import Pipeline
-from peekingduck_gui.config_parser import NodeConfigParser
-from peekingduck_gui.pipeline_model import ModelPipeline
-from peekingduck_gui.gui_widgets import Output, MsgBox
+from peekingduck_studio.config_parser import NodeConfigParser
+from peekingduck_studio.pipeline_model import ModelPipeline
+from peekingduck_studio.gui_widgets import Output, MsgBox
 
 PLAYBACK_INTERVAL = 1 / 60
 ZOOMS = [0.5, 0.75, 1.0, 1.25, 1.50, 2.00]
