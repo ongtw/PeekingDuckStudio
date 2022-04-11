@@ -14,7 +14,8 @@
 # - add performance evaluation support
 #
 # Todo list:
-# - ROOT_PATH to be set properly to /Users for all platforms
+# - alert if no output.screen (also some way to track progress if no output?)
+# - feedback icon for PeekingDuck running in background?
 # - support custom nodes definition
 # - edit config: value range check
 # - edit config: value type check
@@ -33,12 +34,15 @@
 # - convert unicode glyphs to images (for cross platform consistency?)
 # - garbage collect old video frames (need to?)
 
+from typing import List
+from pathlib import Path
+
 ##########
 # Globals
 ##########
-ROOT_PATH = "/"
-CURR_PATH = ROOT_PATH
-print(f"root_path={ROOT_PATH}")
+HOME_PATH = str(Path.home())
+CURR_PATH = HOME_PATH
+print(f"home_path={HOME_PATH}")
 DIR_FILTERS = [""]
 FILE_FILTERS = ["*.yml"]
 WIN_WIDTH = 1280
@@ -69,7 +73,6 @@ from kivy.uix.screenmanager import ScreenManager
 import os
 import json
 import yaml
-from typing import List
 from peekingduck_studio.gui_utils import (
     NODE_COLOR_SELECTED,
     NODE_COLOR_CLEAR,
@@ -344,8 +347,10 @@ PeekingDuck Studio v1.0
 by David Ong Tat-Wee
 (C) 2022
 
-A pipeline editor and playback viewer for PeekingDuck
-
+PeekingDuck Atelier:
+- pipeline editor
+- playback viewer
+- performance evaluator (coming soon)
 
 A multiple-nights/weekends project using Python and Kivy
         """
@@ -370,7 +375,8 @@ A multiple-nights/weekends project using Python and Kivy
         file_dialog = FileLoadDialog(
             select=self.load_file, cancel=self.cancel_file_dialog
         )
-        file_dialog.setup(root_path=ROOT_PATH, path=CURR_PATH, filters=FILE_FILTERS)
+        print(f"btn_load_file: CURR_PATH={CURR_PATH}")
+        file_dialog.setup(root_path=HOME_PATH, path=CURR_PATH, filters=FILE_FILTERS)
         self._file_dialog = Popup(
             title="Load File", content=file_dialog, size_hint=(0.75, 0.75)
         )
@@ -394,7 +400,7 @@ A multiple-nights/weekends project using Python and Kivy
                 save=self.save_file, cancel=self.cancel_file_dialog
             )
             file_dialog.setup(
-                root_path=ROOT_PATH,
+                root_path=HOME_PATH,
                 path=CURR_PATH,
                 filters=FILE_FILTERS,
                 filename=self.filename,
@@ -540,10 +546,13 @@ A multiple-nights/weekends project using Python and Kivy
             path (str): Path containing the pipeline configuration yaml file
             file_paths (List[str]): Selected yaml file(s)
         """
+        global CURR_PATH
+
         self._file_dialog.dismiss()
         print(f"path={path}, file_paths={file_paths}")
         if not file_paths:
             return
+        CURR_PATH = path    # set this as last visited 'current path'
         the_path = file_paths[0]  # only want first file
         # decode project info
         tokens = the_path.split("/")
