@@ -1,29 +1,31 @@
 #
 # PeekingDuck Studio Controller for Node Config
 #
-
 from typing import List
 from kivy.clock import Clock
 from kivy.metrics import Metrics
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 import ast
-from peekingduck_studio.gui_widgets import NodeConfig
+from peekingduck_studio.colors import BLACK, WHITE, GUI_COLOR
 from peekingduck_studio.gui_utils import (
-    NODE_RGBA_COLOR,
-    BLACK,
-    WHITE,
-    NAVY,
-    shake_widget,
-)
-from peekingduck_studio.config_parser import (
+    CUSTOM_NODES,
     NODE_CONFIG_READONLY_KEYS,
     NODE_CONFIG_RESERVED_KEYS,
-    NodeConfigParser,
+    NODE_RGBA_COLOR,
+    get_node_name,
+    get_node_type,
+    guess_config_type,
+    shake_widget,
+    make_logger,
 )
-from peekingduck_studio.pipeline_model import ModelPipeline
+from peekingduck_studio.gui_widgets import NodeConfig, NODE_HEIGHT, NODE_PADDING
+from peekingduck_studio.config_parser import NodeConfigParser
+from peekingduck_studio.model_pipeline import ModelPipeline
 
 NODE_TEXT_INPUT_DELAY = 0.5  # half second
+
+logger = make_logger(__name__)
 
 
 class ConfigController:
@@ -35,6 +37,16 @@ class ConfigController:
         self.config_parser: NodeConfigParser = config_parser
         self.pipeline_model: ModelPipeline = None
         self.overlay: BoxLayout = None
+        self._node_height: int = NODE_HEIGHT
+
+    @property
+    def node_height(self) -> int:
+        return self._node_height
+
+    @node_height.setter
+    def node_height(self, height: int) -> None:
+        self._node_height = max(80, height)
+        self.update_nodes()
 
     def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         """Cache ModelPipeline object within self and init node type spinner values
@@ -61,7 +73,7 @@ class ConfigController:
         Args:
             instance (Widget): the config instance to overlay upon
         """
-        print(f"double-tap {type(instance)}: key={instance.config_key}")
+        logger.debug(f"{type(instance)}: key={instance.config_key}")
         # Move scrollview so that config instance is fully visible,
         # but don't scroll if boxlayout.height < scrollview.height
         # 'coz nodes will flush towards bottom of scrollview and look weird
@@ -69,36 +81,48 @@ class ConfigController:
         if self.config_layout.height > parent.height:
             self.pipeline_config.scroll_to(instance)
 
+        # instance.debug()
         overlay = instance.the_overlay
         key = instance.config_key
         val = instance.config_value
-        print(f"key: {key}, val: {val}, overlay: {overlay.pos} {overlay.size}")
+        logger.debug(f"instance: {type(instance)} {instance.size}")
+        logger.debug(f"key: {key}, val: {val}, overlay: {overlay.pos} {overlay.size}")
 
         if key in NODE_CONFIG_READONLY_KEYS:
             shake_widget(instance)
             return
         if self.overlay:
-            print("overlay present, exiting")
+            logger.debug("overlay present, exiting")
             return
+
+        # configure TextInput overlay
+        # logger.debug(f"instance ids: {instance.ids}")
+        btn_config_val = instance.ids["id_btn_config"]
         text_input = TextInput(
             multiline=False,
             pos=overlay.pos,
             size=overlay.size,
-            text=val,
-            font_size=18 * Metrics.dp,
+            # font_size=18 * Metrics.sp,
+            font_size=btn_config_val.font_size * 1.2,
             halign="center",
             pos_hint={"center_x": 0.5, "center_y": 0.5},
-            size_hint=(1, 1),
+            text=val,
         )
         text_input.bind(on_text_validate=self.text_input_on_enter)
         text_input.bind(focus=self.text_input_on_focus)
         # to simulate valign="center" since it's not available for TextInput
+        # padding = [left, top, right, bottom]
+        top_padding = (
+            text_input.height - 2 * NODE_PADDING - text_input.line_height
+        ) // 2.0
         text_input.padding = [
-            6,
-            text_input.height / 2.0 - (text_input.line_height / 2.0),
-            6,
-            6,
+            Metrics.dp * i
+            for i in [NODE_PADDING, top_padding, NODE_PADDING, NODE_PADDING]
         ]
+        logger.debug(
+            f"text_input: height={text_input.height}, line_height={text_input.line_height}"
+            f", padding: {text_input.padding}"
+        )
         overlay.add_widget(text_input)
         self.overlay = overlay
         # dotw: trick to get text input overlay working...
@@ -114,7 +138,7 @@ class ConfigController:
         Args:
             args (_type_): clock scheduler args
         """
-        print(f"do_focus: args={args}")
+        logger.debug(f"args={args}")
         self.overlay.children[0].focus = True
 
     def text_input_on_enter(self, instance, *args):
@@ -123,8 +147,8 @@ class ConfigController:
         Args:
             instance (_type_): the text input widget
         """
-        print(f"on_enter: instance={instance} args={args}")
-        print(f"  text={instance.text}")
+        logger.debug(f"instance={instance} args={args}")
+        logger.debug(f"text={instance.text}")
 
     def text_input_on_focus(self, instance, value, *args):
         """Handle text input on_focus event.
@@ -134,16 +158,16 @@ class ConfigController:
             instance (_type_): the text input widget
             value (_type_): whether in or out of focus
         """
-        print(f"on_focus: focus={value} instance={instance} args={args}")
+        logger.debug(f"focus={value} instance={instance} args={args}")
         if not value:
             # out of focus, disable overlay TextInput
             assert self.overlay
             great_grandparent = instance.parent.parent.parent
-            # print(f"great_grandparent: {great_grandparent}")
+            # logger.debug(f"great_grandparent: {great_grandparent}")
             val = instance.text
             great_grandparent.config_value = val
             key = great_grandparent.config_key
-            # print(f"key={key} val={val} node_configs={self.node.user_config}")
+            # logger.debug(f"key={key} val={val} node_configs={self.node.user_config}")
 
             # check user input type matches default config type
             try:
@@ -153,12 +177,12 @@ class ConfigController:
             node = self.pipeline_model.get_node_by_uid(self.node_uid)
             node_title = node.node_title
             default_type = self.config_parser.get_default_config_type(node_title, key)
-            val_type = self.config_parser.guess_config_type(key, val_eval)
-            print(
+            val_type = guess_config_type(key, val_eval)
+            logger.debug(
                 f"Check '{key}' type: default {default_type} =? user_input {val_type}"
             )
             if default_type != val_type:
-                print("** NOT EQUAL **")
+                logger.debug("** NOT EQUAL **")
             self.set_node_config(key, val)
             self.overlay.clear_widgets()
             self.overlay = None
@@ -172,7 +196,10 @@ class ConfigController:
             str: node title desired
         """
         header = self.config_header
-        return f"{header.node_type}.{header.node_name}"
+        node_title = f"{header.node_type}.{header.node_name}"
+        if self.config_parser.is_custom_node(node_title):
+            node_title = f"{CUSTOM_NODES}.{node_title}"
+        return node_title
 
     def set_node_config_header(
         self,
@@ -183,10 +210,9 @@ class ConfigController:
         Args:
             node_title (str): new node title for config header
         """
-        # print(f"set_node_config_header: {node_title}")
-        tokens = node_title.split(".")
-        node_type = tokens[0]
-        node_name = tokens[1]
+        logger.debug(f"node_title: {node_title}")
+        node_type = get_node_type(node_title)
+        node_name = get_node_name(node_title)
         # NB: set new list of node names _before_ setting node type and name
         self.set_node_names(node_type)
         self.set_node_type_and_name_no_callback(node_type, node_name)
@@ -217,7 +243,7 @@ class ConfigController:
         """
         header = self.config_header
         if node_type == "Node":  # set GUI colors
-            header.header_color = NAVY
+            header.header_color = GUI_COLOR
             header.font_color = WHITE
         else:  # set colors according to selected node
             node_color = NODE_RGBA_COLOR[node_type]
@@ -231,9 +257,10 @@ class ConfigController:
             node_type (str): given node type
         """
         if node_type not in self.all_node_types:
-            return  # ignore "Node.Config"
+            # ignore "Node.Config"
+            return
         all_node_titles = self.config_parser.get_all_node_titles(node_type)
-        all_node_names = [node_title.split(".")[1] for node_title in all_node_titles]
+        all_node_names = [get_node_name(node_title) for node_title in all_node_titles]
         spinner_node_names = self.config_header.ids["spinner_node_name"]
         spinner_node_names.values = all_node_names
         self.set_node_type_and_name_no_callback(node_name=all_node_names[0])
@@ -252,25 +279,27 @@ class ConfigController:
             val_eval = ast.literal_eval(val)
         except:
             val_eval = val
-        print(f"val: {type(val)} {val}")
+        logger.debug(f"val: {type(val)} {val}")
 
         node = self.pipeline_model.get_node_by_uid(self.node_uid)
         default_val = self.config_parser.get_default_value(node.node_title, key)
-        print(f"Check {val_eval} {type(val_eval)} =? {default_val} {type(default_val)}")
+        logger.debug(
+            f"Check {val_eval} {type(val_eval)} =? {default_val} {type(default_val)}"
+        )
 
         for i, config in enumerate(node.user_config):
             if key in config:
                 # if user value == default value, remove config[key]
                 if val_eval == default_val:
-                    # print(f"removing {i}, {config}")
+                    logger.debug(f"remove {i} {config}")
                     self.pipeline_model.pop_user_config(node.uid, key)
                 else:
-                    # print(f"different, changing config[{key}]")
+                    logger.debug(f"different, change {i} config[{key}]")
                     self.pipeline_model.set_user_config(node.uid, key, val_eval)
                 return  # always return since something is updated
         # if different from default value, add as new user config
         if val_eval != default_val:
-            # print("add new user config")
+            logger.debug(f"add new user config {key}")
             self.pipeline_model.set_user_config(node.uid, key, val_eval)
 
     def reset_node_config_to_default(self, key: str) -> None:
@@ -298,10 +327,14 @@ class ConfigController:
         if uid:
             node = self.pipeline_model.get_node_by_uid(uid)
             user_config = node.user_config
+            logger.debug(f"user_config={user_config}")
             node_title = node.node_title
             self.set_node_config_header(node_title)
         else:
             node_title = self.get_config_header_node_title()
+            # to deal with no selected nodes, i.e. no node config
+            if node_title.startswith("Node."):
+                return
 
         config_layout = self.config_layout
         config_layout.clear_widgets()
@@ -329,12 +362,14 @@ class ConfigController:
                         config_set=tick,
                         config_readonly=k in NODE_CONFIG_READONLY_KEYS,
                         callback_double_tap=self.config_double_tap,
+                        has_tooltip=True,
+                        height=self.node_height,
                     )
                     config_layout.add_widget(config)
-                    # print(f"draw_config: {k}: {the_type} = {v}")
+                    # logger.debug(f"draw_config: {k}: {the_type} = {v}")
                     no_config = False
                 if k == focus_on_config:
-                    instance = config
+                    config_to_focus = config  # save for later focus
         if no_config:
             # add dummy widget showing "No Config" message
             config = NodeConfig(
@@ -343,12 +378,22 @@ class ConfigController:
                 config_value="No user defined configurations",
                 config_set=False,
                 callback_double_tap=None,
+                height=self.node_height,
             )
             config_layout.add_widget(config)
 
         if focus_on_config:
             parent = self.config_layout.parent
             if self.config_layout.height > parent.height:
-                self.pipeline_config.scroll_to(instance)
+                self.pipeline_config.scroll_to(config_to_focus)
         else:
             self.pipeline_config.scroll_y = 1.0  # move scrollview to top
+
+        # config.debug()
+
+    def update_nodes(self):
+        """Update properties of all existing GUI config nodes"""
+        for child in self.config_layout.children:
+            child.update(height=self.node_height)
+        self.config_header.height = self.node_height // 2
+        self.config_header.parent.height = self.config_header.height

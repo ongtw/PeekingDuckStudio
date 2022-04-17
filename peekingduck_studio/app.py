@@ -13,20 +13,30 @@
 # Features:
 # - add performance evaluation support
 #
+# Quirk list:
+# - resize window: long text exceeding button width
+# - resize window: filechooser not scaling up
+#
 # Todo list:
+# - allow user to change current pipeline working directory
+#   (now cwd is changed only upon loading an existing pipeline file)
+#   if has custom nodes, load them and update accordingly
+# - support user custom nodes directory, e.g. `src/my_nodes`
+#   (now default is `src/custom_nodes`)
+# - alert if user saves custom node pipeline to directory without custom nodes
 # - alert if no output.screen (also some way to track progress if no output?)
 # - feedback icon for PeekingDuck running in background?
-# - support custom nodes definition
-# - edit config: value range check
-# - edit config: value type check
+# - edit config error check: value range
+# - edit config error check: value type
 # - edit config: present type-based options when setting values
 # - output: playback speed?
 # - export output as video file
 # - confirmation before any operation that destroys unsaved pipeline
-# - tooltips
+# - file save: confirm before overwriting existing file
 # - user preferences/app config: default folder, etc.
 # - pipeline: error check
 # - pipeline: multiple select (for move / delete)
+# - pipeline: long-click drag to reposition node
 # - anomalous pipelines:
 #   * duplicate nodes
 #   * multiple nodes of same type (any allowed combo?)
@@ -34,34 +44,18 @@
 # - convert unicode glyphs to images (for cross platform consistency?)
 # - garbage collect old video frames (need to?)
 
-from typing import List
-from pathlib import Path
-
-##########
-# Globals
-##########
-HOME_PATH = str(Path.home())
-CURR_PATH = HOME_PATH
-print(f"home_path={HOME_PATH}")
-DIR_FILTERS = [""]
-FILE_FILTERS = ["*.yml"]
-WIN_WIDTH = 1280
-WIN_HEIGHT = 800
-BUTTON_DELAY = 0.2
-PLAYBACK_DELAY = 0.01
-
 ##########
 # Imports
 ##########
 from kivy.config import Config
 from kivy.metrics import Metrics
 
-# change window size from 800x600 to 1024x768 (must be before other kivy modules)
+# change window size from 800x600 to 1024x768 (must be done before importing other kivy modules)
 Config.set("graphics", "width", WIN_WIDTH)
 Config.set("graphics", "height", WIN_HEIGHT)
 Config.set("graphics", "minimum_width", WIN_WIDTH)
 Config.set("graphics", "minimum_height", WIN_HEIGHT)
-Config.set("graphics", "resizable", False)
+Config.set("graphics", "resizable", True)
 
 from kivy.app import App
 from kivy.clock import Clock
@@ -69,9 +63,12 @@ from kivy.core.window import Window
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
+from kivy.uix.widget import Widget
 
-import os
+from typing import List
 import json
+import os
+from pathlib import Path
 import yaml
 from peekingduck_studio.gui_utils import (
     NODE_COLOR_SELECTED,
@@ -79,6 +76,7 @@ from peekingduck_studio.gui_utils import (
     CONFIG_COLOR_SELECTED,
     CONFIG_COLOR_CLEAR,
     shake_widget,
+    make_logger,
 )
 from peekingduck_studio.gui_widgets import (
     FileLoadDialog,
@@ -88,11 +86,28 @@ from peekingduck_studio.gui_widgets import (
     ScreenPipeline,
     ScreenPlayback,
 )
-from peekingduck_studio.config_parser import NodeConfigParser
 from peekingduck_studio.config_controller import ConfigController
+from peekingduck_studio.config_parser import NodeConfigParser
 from peekingduck_studio.output_controller import OutputController
 from peekingduck_studio.pipeline_controller import PipelineController
-from peekingduck_studio.pipeline_model import ModelPipeline
+from peekingduck_studio.model_pipeline import ModelPipeline
+
+##########
+# Globals
+##########
+ROOT_PATH = "/"
+# temp: for convenience
+# CURR_PATH = "/Users/dotw/src/pkd"
+CURR_PATH = str(Path.home())
+DIR_FILTERS = [""]
+FILE_FILTERS = ["*yml"]
+WIN_WIDTH: int = 1280
+WIN_HEIGHT: int = 800
+BUTTON_DELAY: float = 0.2
+PLAYBACK_DELAY: float = 0.01
+
+logger = make_logger(__name__)
+logger.info(f"root_path={ROOT_PATH}, curr_path={CURR_PATH}")
 
 
 class PeekingDuckStudioApp(App):
@@ -134,7 +149,20 @@ class PeekingDuckStudioApp(App):
         # )
         # self._keyboard.bind(on_key_down=self.on_keyboard_down)
 
+        Window.bind(on_resize=self.on_window_resize)
+
         return sm
+
+    # Window events (experimental)
+    def on_window_resize(self, win, width, height):
+        # recalculate height for GUI node/node config
+        increase = height / WIN_HEIGHT - 1.0
+        new_node_height = int(80 * (1.0 + increase * 0.3))
+        # logger.debug(f"x={width}, y={height}, new_node_height={new_node_height}")
+        self.pipeline_controller.node_height = new_node_height
+        self.config_controller.node_height = new_node_height
+        self.output_controller.node_height = new_node_height
+        self.font_size = max(16, int(15 * Window.height / WIN_HEIGHT)) * Metrics.sp
 
     # Keyboard events (experimental codes)
     def to_window(self, x, y, initial=True, relative=False):
@@ -146,7 +174,7 @@ class PeekingDuckStudioApp(App):
         self._keyboard = None
 
     def on_keyboard_down(self, keyboard, keycode, text, modifiers) -> bool:
-        print(f"Keycode: {keycode} pressed, text={text}, modifiers={modifiers}")
+        logger.debug(f"keycode: {keycode} pressed, text={text}, modifiers={modifiers}")
         # if keycode[1] == "escape":
         #     keyboard.release()  # stop accepting key inputs
         # if keycode[1] == "escape":
@@ -169,6 +197,7 @@ class PeekingDuckStudioApp(App):
         """Pre-declare working vars to avoid crashing on var not found errors"""
         self.btn_node_move_down_held = None
         self.btn_node_move_up_held = None
+        self.font_size = 15 * Metrics.sp
 
     # Misc
     def clear_selected_configs(self) -> None:
@@ -198,12 +227,10 @@ class PeekingDuckStudioApp(App):
     # App GUI Event Callbacks
     # Buttons: generic dummy callbacks
     def btn_press(self, btn) -> None:
-        parent = btn.parent
-        print(f"btn_press: '{btn.text}' tag={parent.tag}")
+        logger.debug(f"press: '{btn.text}' tag={btn.tag}")
 
     def btn_release(self, btn) -> None:
-        parent = btn.parent
-        print(f"btn_release: '{btn.text}' tag={parent.tag}")
+        logger.debug(f"release: '{btn.text}' tag={btn.tag}")
 
     # Buttons: Specific
     # Screen transitions
@@ -220,13 +247,16 @@ class PeekingDuckStudioApp(App):
             self.screen_playback.bind(on_enter=self.auto_play_once)
         else:
             msgbox = MsgBox(
-                "Alert", "No pipeline to run. Please create one first.", "Ok"
+                "Alert",
+                "No pipeline to run. Please create one first.",
+                "Ok",
+                font_size=self.font_size,
             )
             msgbox.show()
 
     def auto_play_once(self, *args) -> None:
         """Autostart playback upon entering playback screen"""
-        print(f"auto_play: args={args}")
+        logger.debug(f"args={args}")
         self.screen_playback.unbind(on_enter=self.auto_play_once)
         if self.pipeline_model:
             self.output_controller.play_stop()  # auto play
@@ -242,7 +272,7 @@ class PeekingDuckStudioApp(App):
         floatlayout = btn.parent
         config = floatlayout.parent
         config_key = config.config_key
-        print(f"btn_config_press: btn.text={btn.text} config_key={config_key}")
+        logger.debug(f"btn.text={btn.text} config_key={config_key}")
         config.select_color = CONFIG_COLOR_SELECTED
         self.all_selected_configs.add(config)
 
@@ -252,10 +282,9 @@ class PeekingDuckStudioApp(App):
         Args:
             btn (Button): the reset button
         """
-        # print(f"btn_config_press: btn.text={btn.text}")
         config = btn.parent.parent.parent
         config_key = config.config_key
-        print(f"btn_config_press: btn.text={btn.text} config_key={config_key}")
+        logger.debug(f"btn.text={btn.text} config_key={config_key}")
         self.config_controller.reset_node_config_to_default(config_key)
 
     def btn_toggle_config_state(self, *args) -> None:
@@ -276,8 +305,10 @@ class PeekingDuckStudioApp(App):
         Args:
             instance (Button): the selected node type button
         """
+        if self.selected_node is None:
+            return
         node_type = instance.text
-        print(f"btn_node_type_select: {node_type}")
+        logger.debug(f"node_type: {node_type}")
         # update spinner to show correct name
         instance.parent.node_type = node_type
         self.config_controller.set_node_names(node_type)
@@ -289,9 +320,12 @@ class PeekingDuckStudioApp(App):
         Args:
             instance (Button): the selected node name button
         """
-        print(f"btn_node_name_select: {instance.text}")
+        if self.selected_node is None:
+            return
+        node_name = instance.text
+        logger.debug(f"node_name: {node_name}")
         # update spinner to show correct name
-        instance.parent.node_name = instance.text
+        instance.parent.node_name = node_name
         # refresh configuration view with node defaults
         self.config_controller.show_node_configs()
         self._replace_current_selected_pipeline_node()
@@ -306,8 +340,10 @@ class PeekingDuckStudioApp(App):
         node_num = int(gui_node.node_number)
         node_idx = node_num - 1  # index of node to replace
         new_node_title = self.config_controller.get_config_header_node_title()
-        # old_node_title = gui_node.button.text
-        # print(f"  replace {node_num}:{old_node_title} with {new_node_title}")
+        # debug
+        old_node_title = gui_node.button.text
+        logger.debug(f"replace {node_num}:{old_node_title} with {new_node_title}")
+        # end debug
         gui_node = self.pipeline_controller.replace_with_new_node(
             node_idx, new_node_title
         )
@@ -321,7 +357,7 @@ class PeekingDuckStudioApp(App):
         Args:
             node (Node): the node that is clicked on
         """
-        # print(f"btn_node_press: {node.node_text}")
+        logger.debug(f"node_text: {node.node_text}")
         self.clear_selected_nodes()
         self._mark_selected_node(node)
         self.pipeline_controller.focus_on_node(node)
@@ -354,7 +390,7 @@ PeekingDuck Atelier:
 
 A multiple-nights/weekends project using Python and Kivy
         """
-        msgbox = MsgBox(title, msg, "Ok")
+        msgbox = MsgBox(title, msg, "Ok", font_size=self.font_size)
         msgbox.show()
 
     def btn_quit(self, btn) -> None:
@@ -375,8 +411,8 @@ A multiple-nights/weekends project using Python and Kivy
         file_dialog = FileLoadDialog(
             select=self.load_file, cancel=self.cancel_file_dialog
         )
-        print(f"btn_load_file: CURR_PATH={CURR_PATH}")
-        file_dialog.setup(root_path=HOME_PATH, path=CURR_PATH, filters=FILE_FILTERS)
+        logger.debug(f"CURR_PATH={CURR_PATH}")
+        file_dialog.setup(root_path=ROOT_PATH, path=CURR_PATH, filters=FILE_FILTERS)
         self._file_dialog = Popup(
             title="Load File", content=file_dialog, size_hint=(0.75, 0.75)
         )
@@ -388,10 +424,10 @@ A multiple-nights/weekends project using Python and Kivy
         Args:
             btn (Button): the New button
         """
-        print("btn_new_file")
-        self.filename = "new_pipeline.yml"
-        self.project_info.filename = self.filename
+        logger.debug("new pipeline")
         self.pipeline_model = ModelPipeline()
+        self.filename = self.pipeline_model.filename
+        self.project_info.filename = self.filename
         self._do_begin_pipeline()
 
     def btn_save_file(self, btn) -> None:
@@ -400,7 +436,7 @@ A multiple-nights/weekends project using Python and Kivy
                 save=self.save_file, cancel=self.cancel_file_dialog
             )
             file_dialog.setup(
-                root_path=HOME_PATH,
+                root_path=ROOT_PATH,
                 path=CURR_PATH,
                 filters=FILE_FILTERS,
                 filename=self.filename,
@@ -411,7 +447,10 @@ A multiple-nights/weekends project using Python and Kivy
             self._file_dialog.open()
         else:
             msgbox = MsgBox(
-                "File Save Alert", "No pipeline to save. Please create one first.", "Ok"
+                "File Save Alert",
+                "No pipeline to save. Please create one first.",
+                "Ok",
+                font_size=self.font_size,
             )
             msgbox.show()
 
@@ -422,17 +461,7 @@ A multiple-nights/weekends project using Python and Kivy
             btn (Button): the Sound On/Off button
         """
         parent = btn.parent
-        print(f"btn_sound_on_off: tag={parent.tag}")
-
-    def clean_json(self, json_str: str) -> str:
-        # dotw: quick hack, to properly replace single and double quotes
-        # replace " with ``
-        cleaned = json_str.replace('"', "`")
-        # replace ' with "
-        cleaned = cleaned.replace("'", '"')
-        # replace `` with '
-        cleaned = cleaned.replace("`", "'")
-        return cleaned
+        logger.debug(f"tag={parent.tag}")
 
     def btn_yaml(self, btn) -> None:
         """Show pipeline's yaml source code
@@ -440,22 +469,79 @@ A multiple-nights/weekends project using Python and Kivy
         Args:
             btn (_type_): the Yaml button
         """
+
+        def split_long_line(yaml_line: str, max_len: int = 80, indent: int = 4) -> str:
+            """Helper method to split a long YAML line, if it contains a comma.
+            Even though 'width=80' is set in yaml.dump, it does not work for long string
+            parameters, which is split into two lines here.
+            """
+            if len(yaml_line) <= max_len:
+                return yaml_line
+            text = []
+            if "," in yaml_line:
+                tokens = yaml_line.split(",")
+                is_comma = True
+            elif "{" in yaml_line and "}" in yaml_line:
+                tokens = yaml_line.split("{")
+                is_comma = False
+            else:
+                return yaml_line  # nothing to split on
+            curr_str = ""
+            for tok in tokens:
+                tok = tok.strip()
+                if tok.endswith("}") and "{" not in tok:
+                    tok = tok[:-1]
+                if tok:
+                    if len(curr_str) + len(tok) <= max_len:
+                        curr_str = f"{curr_str},{tok}" if curr_str else tok
+                    else:
+                        text.append(f"{curr_str}{',' if is_comma else ''}")
+                        curr_str = f"{' '*indent}{tok}"
+                else:
+                    # empty tok means orig line ends with a ","
+                    curr_str = f"{curr_str},"
+            if curr_str:
+                text.append(curr_str)
+            return text
+
+        def split_long_yaml_lines(yaml_str: str) -> str:
+            """Helper method to process a multiline YAML dump string and split long lines
+
+            Args:
+                yaml_str (str): the YAML dump string
+
+            Returns:
+                str: the reformatted string, if any
+            """
+            if "\n" not in yaml_str:
+                return yaml_str
+            text = []
+            tokens = yaml_str.split("\n")
+            for tok in tokens:
+                if tok:
+                    logger.debug(f" > tok={len(tok)}, {tok}")
+                    x = split_long_line(tok)
+                    logger.debug(f"tok_split={x}")
+                    text.extend(x) if isinstance(x, list) else text.append(x)
+            return "\n".join(text)
+
         if self.pipeline_model:
             json_str = self.pipeline_model.get_string_representation()
-            print(f"json_str: {json_str}")
-            clean_json_str = self.clean_json(json_str)
-            print(f"clean_json_str: {clean_json_str}")
-            dd = json.loads(clean_json_str)
-            print(f"dd: {type(dd)} {dd}")
-            ss = yaml.dump(dd, default_flow_style=None)
-            print(f"ss: {ss}")
+            logger.debug(f"json_str: {json_str}")
+            dd = json.loads(json_str)
+            logger.debug(f"dd: {type(dd)} {dd}")
+            yaml_str = yaml.dump(dd, default_flow_style=None, width=60)
+            logger.debug(f"yaml_str: {yaml_str}")
+            # yaml_clean = split_long_yaml_lines(yaml_str)
+            yaml_clean = yaml_str
+            logger.debug(f"yaml_clean: {yaml_clean}")
 
             msgbox = MsgBox(
                 "Yaml Source Code",
-                ss,
+                yaml_clean,
                 "Ok",
                 font_name="Courier New",
-                font_size=18 * Metrics.dp,
+                font_size=self.font_size,
             )
             msgbox.show()
         else:
@@ -463,6 +549,7 @@ A multiple-nights/weekends project using Python and Kivy
                 "Alert",
                 "No pipeline to display. Please create one first.",
                 "Ok",
+                font_size=self.font_size,
             )
             msgbox.show()
 
@@ -478,15 +565,13 @@ A multiple-nights/weekends project using Python and Kivy
     def btn_replay_press(self, btn) -> None:
         if self.pipeline_model is None:
             return
-        tag = btn.parent.tag
-        print(f"btn_replay_press: tag={tag}")
+        logger.debug(f"tag={btn.tag}")
         self.output_controller.replay()
 
     def btn_play_stop_press(self, btn) -> None:
         if self.pipeline_model is None:
             return
-        tag = btn.parent.tag
-        print(f"btn_play_stop_press: tag={tag}")
+        logger.debug(f"tag={btn.tag}")
         self.output_controller.play_stop()
 
     def btn_forward_press(self, *args) -> None:
@@ -529,7 +614,7 @@ A multiple-nights/weekends project using Python and Kivy
     Args:
         touch (_type_): the touch event
     """
-    # print(f"app touch: {touch.x}, {touch.y}")
+    # logger.debug(f"app touch: {touch.x}, {touch.y}")
     # if self.pkd_output.collide_point(*touch.pos):
     #     self.clear_selected_configs()
     #     self.clear_selected_nodes()
@@ -539,27 +624,38 @@ A multiple-nights/weekends project using Python and Kivy
     #####################
     # File operations
     #####################
-    def load_file(self, path: str, file_paths: List[str]) -> None:
-        """Method to load PeekingDuck pipeline configuration yaml file
+    def load_file(self, instance: Widget, file_paths: List[str], *args) -> None:
+        """Load selected PeekingDuck pipeline configuration yaml file.
+        Called when user selects a file and clicks Select button in FileLoadDialog.
+
+        Technote: there are spurious callbacks when selection is a folder and not a
+                  file! (Kivy bug??) That's why need to check file ends with ".yml"
+                  to ensure it's not a folder.
+                  A more robust (but slower) way is to use Path to check for file.
 
         Args:
             path (str): Path containing the pipeline configuration yaml file
-            file_paths (List[str]): Selected yaml file(s)
+            file_paths (List[str]): Selected yaml file(s) (default 1)
         """
         global CURR_PATH
-
-        self._file_dialog.dismiss()
-        print(f"path={path}, file_paths={file_paths}")
+        # logger.debug(f"instance={instance}, file_paths={file_paths}")
         if not file_paths:
+            logger.debug(f"empty file_paths={file_paths}")
             return
-        CURR_PATH = path    # set this as last visited 'current path'
         the_path = file_paths[0]  # only want first file
+        if not the_path.endswith(".yml"):
+            logger.debug(f"bogus submit: file={the_path}")
+            return
+        self._file_dialog.dismiss()
         # decode project info
+        logger.debug(f"path={the_path}")
         tokens = the_path.split("/")
         self.filename = tokens[-1]
-        self.project_info.directory = os.path.dirname(the_path)
+        CURR_PATH = os.path.dirname(the_path)  # set as last visited path
+        self.project_info.directory = CURR_PATH
         self.project_info.filename = self.filename
         self.pipeline_model = ModelPipeline(the_path)
+        self.config_parser.set_pipeline_model(self.pipeline_model)
         self._do_begin_pipeline()
 
     def _do_begin_pipeline(self) -> None:
@@ -568,22 +664,22 @@ A multiple-nights/weekends project using Python and Kivy
         """
         self.config_controller.set_pipeline_model(self.pipeline_model)
         self.output_controller.set_pipeline_model(self.pipeline_model)
-        self.output_controller.set_output_header(self.filename)
         self.pipeline_controller.set_pipeline_model(self.pipeline_model)
         self.pipeline_controller.draw_nodes()
 
-    def save_file(self, path: str, file_paths: List[str]) -> None:
+    def save_file(self, path: str, file_path: str) -> None:
         self._file_dialog.dismiss()
-        full_path = f"{path}/{file_paths}"
-        print("save_file")
-        print(f"  path: {path}, file_paths: {file_paths}")
-        print(f"  full_path: {full_path}")
+        full_path = file_path if file_path.startswith(path) else f"{path}/{file_path}"
+        logger.debug(f"path: {path}, file_path: {file_path}")
+        logger.debug(f"full_path: {full_path}")
         json_str = self.pipeline_model.get_string_representation()
         clean_json_str = self.clean_json(json_str)
         dd = json.loads(clean_json_str)
         with open(full_path, "w") as outfile:
             yaml.dump(dd, outfile, default_flow_style=None)
-        msgbox = MsgBox("Alert", f"File saved to {full_path}", "Ok")
+        msgbox = MsgBox(
+            "Alert", f"File saved to {full_path}", "Ok", font_size=self.font_size
+        )
         msgbox.show()
 
     #####################
@@ -592,7 +688,7 @@ A multiple-nights/weekends project using Python and Kivy
     def btn_node_add(self, instance) -> None:
         if self.pipeline_model is None:
             return
-        print("btn_node_add")
+        logger.debug("add node")
         if self.selected_node:
             idx = int(self.selected_node.node_number) - 1
         else:
@@ -614,12 +710,12 @@ A multiple-nights/weekends project using Python and Kivy
     def btn_node_delete(self, instance) -> None:
         if self.pipeline_model is None:
             return
-        print("btn_node_delete")
+        logger.debug("delete node")
         if self.selected_node:
             shake_widget(self.selected_node)
             Clock.schedule_once(self.clock_do_delete_node, 1.0)
         else:
-            print("nothing selected to delete")
+            logger.debug("nothing selected to delete")
 
     def clock_do_delete_node(self, *args) -> None:
         idx = int(self.selected_node.node_number) - 1
@@ -645,7 +741,7 @@ A multiple-nights/weekends project using Python and Kivy
             node = self.selected_node
             node_num = int(node.node_number)
             node_title = node.button.text
-            print(f"btn_node_move_up_release: selected={node_num} {node_title}")
+            logger.debug(f"selected={node_num} {node_title}")
 
     def btn_node_move_down_press(self, *args) -> None:
         if self.all_selected_nodes:
@@ -666,11 +762,11 @@ A multiple-nights/weekends project using Python and Kivy
             node = self.selected_node
             node_num = int(node.node_number)
             node_title = node.button.text
-            print(f"btn_node_move_down_release: selected={node_num} {node_title}")
+            logger.debug(f"selected={node_num} {node_title}")
 
     def btn_verify_pipeline(self, *args) -> None:
         res = self.pipeline_controller.verify_pipeline()
-        print(res)
+        logger.debug(res)
 
 
 if __name__ == "__main__":

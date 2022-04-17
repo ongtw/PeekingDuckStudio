@@ -3,10 +3,13 @@
 #
 
 from typing import List, Union
-from peekingduck_studio.gui_utils import NODE_COLOR_SELECTED
-from peekingduck_studio.gui_widgets import Node
+from peekingduck_studio.gui_utils import NODE_COLOR_SELECTED, make_logger
+from peekingduck_studio.gui_widgets import Node, NODE_HEIGHT
 from peekingduck_studio.config_parser import NodeConfigParser
-from peekingduck_studio.pipeline_model import ModelNode, ModelPipeline
+from peekingduck_studio.model_node import ModelNode
+from peekingduck_studio.model_pipeline import ModelPipeline
+
+logger = make_logger(__name__)
 
 
 class PipelineController:
@@ -17,6 +20,16 @@ class PipelineController:
         self.nodes_layout = self.nodes_view.ids["pipeline_layout"]
         self.config_parser: NodeConfigParser = config_parser
         self.pipeline_model: ModelPipeline = None
+        self._node_height: int = NODE_HEIGHT
+
+    @property
+    def node_height(self) -> int:
+        return self._node_height
+
+    @node_height.setter
+    def node_height(self, height: int) -> None:
+        self._node_height = max(80, height)
+        self.update_nodes()
 
     def add_node(self, idx: int) -> Node:
         """Add new node at pipeline position idx
@@ -27,7 +40,7 @@ class PipelineController:
         Returns:
             Node: the GUI node associated with the new node
         """
-        print(f"add_node: at index {idx}")
+        logger.debug(f"at index {idx}")
         self.pipeline_model.node_insert(idx)
         node = self.pipeline_model.get_node_by_index(idx)
         gui_node = self.draw_nodes(node.uid)
@@ -39,7 +52,7 @@ class PipelineController:
         Args:
             idx (int): position index of node to delete
         """
-        print(f"delete node: at index {idx}")
+        logger.debug(f"at index {idx}")
         self.pipeline_model.node_delete(idx)
         self.draw_nodes()
 
@@ -49,6 +62,7 @@ class PipelineController:
         Args:
             node (Node): the GUI node to focus on
         """
+        logger.debug(f"node: {node.node_text}")
         parent = self.nodes_layout.parent
         if self.nodes_layout.height > parent.height:
             self.nodes_view.scroll_to(node)
@@ -68,6 +82,7 @@ class PipelineController:
         Returns:
             Node: the new GUI node of the moved old GUI node (see technote below)
         """
+        logger.debug(f"node: {node.node_text} direction: {direction}")
         if direction == "up":
             self.pipeline_model.node_move_up(node.node_id)
         elif direction == "down":
@@ -94,6 +109,7 @@ class PipelineController:
             i (int): index of node to be replaced
             new_node_title (str): title of new node to be created
         """
+        logger.debug(f"index {i} with {new_node_title}")
         new_node = ModelNode(new_node_title)
         self.pipeline_model.node_replace(i, new_node)
         gui_node = self.draw_nodes(new_node.uid)
@@ -144,6 +160,7 @@ class PipelineController:
         Returns:
             Union[Node, None]: GUI node of interest
         """
+        logger.debug(f"return_uid: {return_uid}")
         self.nodes_layout.clear_widgets()
         gui_node_to_return = None
         n = self.pipeline_model.num_nodes
@@ -151,10 +168,18 @@ class PipelineController:
         for i in range(n):
             node = self.pipeline_model.get_node_by_index(i)
             node_num = i + 1
-            gui_node = Node(node.uid, node.node_title, node_num)
-            print(f"draw_nodes: {node_num} {node.node_title}")
+            gui_node = Node(
+                node.uid, node.node_title, node_num, height=self.node_height
+            )
+            logger.debug(f"node_num: {node_num} node_title: {node.node_title}")
             self.nodes_layout.add_widget(gui_node)
 
             if return_uid == node.uid:
                 gui_node_to_return = gui_node
         return gui_node_to_return
+
+    def update_nodes(self) -> None:
+        """Update properties of all existing GUI nodes"""
+        for child in self.nodes_layout.children:
+            child.update(height=self.node_height)
+        self.pipeline_header.height = self.node_height // 2

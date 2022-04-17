@@ -2,103 +2,49 @@
 # PeekingDuck Studio Model for Pipeline
 #
 
-from re import U
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-import uuid
 import yaml
+from peekingduck_studio.model_node import NO_USER_CONFIG, ModelNode
+from peekingduck_studio.gui_utils import (
+    find_config_dirs,
+    guess_config_value_types,
+    has_custom_nodes,
+    parse_configs,
+    make_logger,
+)
 
 EMPTY_NODE = "augment.brightness"
-NO_USER_CONFIG = [{"None": "No Config"}]
-DEFAULT_URL = "https://storage.googleapis.com/peekingduck/videos/wave.mp4"
+DEFAULT_PIPELINE_FILENAME = "pipeline_config.yml"
+# DEFAULT_URL = "https://storage.googleapis.com/peekingduck/videos/wave.mp4"
 
-
-class ModelNode:
-    def __init__(self, node_title: str, user_config: Optional[List] = None) -> None:
-        self._uid: str = str(uuid.uuid4())
-        self._node_title = node_title
-        self._user_config = user_config if user_config else NO_USER_CONFIG
-
-    def __str__(self) -> str:
-        ss = [
-            f"Node: {self._node_title} {self._uid}",
-            f"{self._user_config}",
-            "----------",
-        ]
-        return "\n".join(ss)
-
-    @property
-    def uid(self) -> str:
-        return self._uid
-
-    @property
-    def node_title(self) -> str:
-        return self._node_title
-
-    @node_title.setter
-    def node_title(self, node_title: str) -> None:
-        self._node_title = node_title
-
-    @property
-    def user_config(self) -> List:
-        return self._user_config
-
-    @user_config.setter
-    def user_config(self, user_config: List) -> None:
-        self._user_config = user_config
-
-    def pop_user_config(self, key: str) -> None:
-        """Delete node's user config for given key.
-
-        Args:
-            key (str): key of user config to delete
-        """
-        for i, dd in enumerate(self._user_config):
-            if key in dd:
-                self._user_config.pop(i)
-                break
-        # don't forget to handle empty user config, else will cause bugs
-        if not self._user_config:
-            self._user_config = NO_USER_CONFIG
-
-    def set_user_config(self, key: str, val: Any) -> None:
-        """Set or update node's user config with given {key,val} pair.
-
-        Args:
-            key (str): user config key
-            val (Any): user config value
-        """
-        if self._user_config == NO_USER_CONFIG:
-            self._user_config = [{key: val}]
-        else:
-            # if key exists in any config, update it else append new config
-            found: bool = False
-            for dd in self._user_config:
-                if key in dd:
-                    dd[key] = val
-                    found = True
-                    break
-            if not found:
-                self._user_config.append({key: val})
+logger = make_logger(__name__)
 
 
 class ModelPipeline:
     def __init__(self, the_path: Optional[str] = None) -> None:
+        # todo: take in a working_dir parameter
         # declare internal working vars
         self._idx_to_node: List[ModelNode] = None  # indexed lookup
         self._uid_to_idx: Dict[str, int] = None  # reverse lookup
         if the_path:
+            self._filepath: Path = Path(the_path)
             self.load_pipeline(the_path)
             self.parse_pipeline()
+            self.load_custom_nodes()
         else:
+            self._filepath: Path = Path(DEFAULT_PIPELINE_FILENAME)
             basic_pipeline = {
                 "nodes": [
-                    {"input.visual": {"source": DEFAULT_URL}},
+                    "input.visual",
                     "model.posenet",
                     "draw.poses",
                     "output.screen",
                 ]
             }
             self.parse_pipeline(basic_pipeline)
+            # todo: support custom nodes for new pipeline
+            #       e.g. use case: user creates new pipeline in a folder with custom nodes
         self.set_dirty_bit()
 
     def __getitem__(self, i: int) -> Union[ModelNode, None]:
@@ -116,6 +62,22 @@ class ModelPipeline:
         return self._dirty_bit
 
     @property
+    def filename(self) -> str:
+        return self._filepath.name
+
+    @property
+    def filepath(self) -> str:
+        return str(self._filepath)
+
+    @property
+    def fileparent(self) -> str:
+        return str(self._filepath.parent)
+
+    @property
+    def has_custom_nodes(self) -> bool:
+        return self._has_custom_nodes
+
+    @property
     def num_nodes(self) -> int:
         return len(self._idx_to_node)
 
@@ -124,10 +86,31 @@ class ModelPipeline:
         return self._idx_to_node
 
     def debug(self) -> None:
-        print(f"pipeline: {self.num_nodes} nodes")
+        logger.debug(f"pipeline: {self.num_nodes} nodes")
         for i in range(self.num_nodes):
             node = self._idx_to_node[i]
-            print(f"{i} {node}")
+            logger.debug(f"{i} {node}")
+
+    def clean_yaml(self, yaml_str: str) -> str:
+        """Clean YAML string to JSON-compliant string
+
+        Args:
+            yaml_str (str): the YAML string
+
+        Returns:
+            str: the JSON string
+        """
+        # todo: properly replace single and double quotes
+        # replace " with ``
+        cleaned = yaml_str.replace('"', "`")
+        # replace ' with "
+        cleaned = cleaned.replace("'", '"')
+        # replace `` with '
+        cleaned = cleaned.replace("`", "'")
+        # lowercase True/False (YAML) to true/false (JSON)
+        cleaned = cleaned.replace("True", "true")
+        cleaned = cleaned.replace("False", "false")
+        return cleaned
 
     def clear_dirty_bit(self) -> None:
         self._dirty_bit = False
@@ -178,21 +161,22 @@ class ModelPipeline:
         for node in node_list:
             node_title = node.node_title
             user_config = node.user_config
-            print(f"{node_title} -> {user_config}")
+            logger.debug(f"{node_title} -> {user_config}")
 
             if "None" in user_config[0]:
-                # print(f"append {node_title}")
+                logger.debug(f"append {node_title}")
                 pipeline_nodes.append(node_title)
             else:
                 configs = {k: v for dd in user_config for k, v in dd.items()}
                 node_dict = {node_title: configs}
-                # print(f"append {node_dict}")
+                logger.debug(f"append {node_dict}")
                 pipeline_nodes.append(node_dict)
 
         pipeline = {"nodes": pipeline_nodes}
-        res = f"{pipeline}"
-        print("run pipeline:", res)
-        return res
+        yaml_str = f"{pipeline}"
+        json_str = self.clean_yaml(yaml_str)
+        logger.debug(f"run pipeline: {json_str}")
+        return json_str
 
     def load_pipeline(self, pipeline_path: str) -> None:
         """Load pipeline file in given path
@@ -202,8 +186,7 @@ class ModelPipeline:
         """
         with open(pipeline_path) as file:
             self._pipeline = yaml.safe_load(file)
-        print(f"load_pipeline: {type(self._pipeline)}")
-        print(self._pipeline)
+        logger.debug(f"self._pipeline: {type(self._pipeline)} {self._pipeline}")
 
     def parse_pipeline(self, the_pipeline: Optional[Dict] = None) -> None:
         """Parse pipeline and create internal representation of it.
@@ -239,6 +222,48 @@ class ModelPipeline:
             node = ModelNode(node_title, user_config)
             self._idx_to_node[i] = node
             self._uid_to_idx[node.uid] = i
+
+    ####################
+    # Custom Nodes extension
+    ####################
+    @property
+    def custom_nodes_by_type(self) -> Dict:
+        return self._cust_nodes_by_type
+
+    @property
+    def custom_nodes_default_config_map(self) -> Dict:
+        return self._cust_default_config_map
+
+    @property
+    def custom_nodes_default_config_types(self) -> Dict:
+        return self._cust_default_config_types
+
+    def load_custom_nodes(self) -> None:
+        """Load custom nodes config yaml if present, by checking for non-empty
+        `src/custom_nodes/config` directory within pipeline's parent path
+        """
+        cust_node_config_path = self._filepath.parent / "src/custom_nodes/configs"
+        if has_custom_nodes(cust_node_config_path):
+            logger.debug(
+                f"cust_node_config_path={cust_node_config_path} has custom nodes"
+            )
+            self._has_custom_nodes = True
+            cust_nodes_config_dirs = find_config_dirs(cust_node_config_path)
+            logger.debug(f"cust_nodes_config_dirs: {cust_nodes_config_dirs}")
+            self._cust_nodes_by_type, self._cust_default_config_map = parse_configs(
+                cust_nodes_config_dirs
+            )
+            self._cust_default_config_types = guess_config_value_types(
+                self._cust_default_config_map
+            )
+            logger.debug("cust_nodes_by_type:")
+            logger.debug(self._cust_nodes_by_type)
+            logger.debug("cust_default_config_map:")
+            logger.debug(self._cust_default_config_map)
+            logger.debug("cust_default_config_types:")
+            logger.debug(self._cust_default_config_types)
+        else:
+            self._has_custom_nodes = False
 
     ####################
     # Node Management
@@ -392,18 +417,18 @@ def main():
     pipeline.parse_pipeline(data)
 
     n = len(pipeline)
-    print(f"Pipeline has {n} nodes")
-    print(pipeline)
+    logger.debug(f"Pipeline has {n} nodes")
+    logger.debug(pipeline)
     pipeline.node_insert(n)
 
     n = len(pipeline)
-    print(f"Pipeline has {n} nodes")
-    print(pipeline)
+    logger.debug(f"Pipeline has {n} nodes")
+    logger.debug(pipeline)
     node = pipeline.get_node_by_index(n - 1)
     pipeline.node_move_up(node.uid)
 
-    print("after move up:")
-    print(pipeline)
+    logger.debug("after move up:")
+    logger.debug(pipeline)
 
 
 if __name__ == "__main__":

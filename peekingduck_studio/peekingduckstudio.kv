@@ -1,30 +1,45 @@
 #:kivy 2.0.0
 #:import hex kivy.utils.get_color_from_hex
 #:import Factory kivy.factory.Factory
+#:import Window kivy.core.window.Window
 
 # Globals: colors
-#:set BLACK 0, 0, 0, 1
-#:set BLUE 0, 0, 1, 1
-#:set DODGER_BLUE 30/255, 144/255, 1, 1
-#:set GRAY 0.5, 0.5, 0.5, 1
-#:set GREEN 0, 1, 0, 1
-#:set NAVY 0, 0, 0.5, 1
-#:set RED 1, 0, 0, 1
-#:set ROYAL_BLUE 65/255, 105/255, 225/255, 1
-#:set SILVER 192/255, 192/255, 192/255, 1
-#:set WHITE 1, 1, 1, 1
-#:set YELLOW 0.9, 0.9, 0, 1
+#:import BLACK peekingduck_studio.colors.BLACK
+#:import BLUE peekingduck_studio.colors.BLUE
+#:import DODGER_BLUE peekingduck_studio.colors.DODGER_BLUE
+#:import GRAY peekingduck_studio.colors.GRAY
+#:import GREEN peekingduck_studio.colors.GREEN
+#:import NAVY peekingduck_studio.colors.NAVY
+#:import RED peekingduck_studio.colors.RED
+#:import ROYAL_BLUE peekingduck_studio.colors.ROYAL_BLUE
+#:import SILVER peekingduck_studio.colors.SILVER
+#:import WHITE peekingduck_studio.colors.WHITE
+#:import YELLOW peekingduck_studio.colors.YELLOW
+#:import GUI_COLOR peekingduck_studio.colors.GUI_COLOR
+#:import CONFIG_COLOR peekingduck_studio.colors.CONFIG_COLOR
+#:set TRANSPARENT 1, 1, 1, 0
 
 # Globals: sizing
-#:set HEADER_HEIGHT 40
-#:set CONTROLS_HEIGHT 40
-#:set NODE_HEIGHT 70
-#:set NODE_PADDING 5
-#:set CONFIG_HEIGHT 70
-#:set CONFIG_PADDING 5
+#:set MIN_HEIGHT 1000
+#:set MIN_WIDTH 1600
+#:set BUTTON_HEIGHT_RATIO 0.04
+#:set BUTTON_MIN_HEIGHT dp(40)
+#:set BUTTON_FONT_SCALE 0.50
+#:set BUTTON_FONT_SMALLER 0.40
+#:set BUTTON_FONT_LARGER 0.75
+#:import CONFIG_PADDING peekingduck_studio.gui_widgets.NODE_PADDING
+#:import NODE_FONT_SCALE peekingduck_studio.gui_widgets.NODE_TEXT_SCALE
+#:import NODE_PADDING peekingduck_studio.gui_widgets.NODE_PADDING
+#:set CONFIG_INDICATOR_WIDTH 24
+#:set HEADER_HEIGHT dp(40)
+#:set HEADER_MIN_HEIGHT dp(40)
+#:set HEADER_HEIGHT_RATIO 0.04
+#:set RADIUS dp(12)
+#:set PIPELINE_NODE_WIDTH 0.38
+#:set PIPELINE_CONFIG_WIDTH 0.62
+#:set PIPELINE_CONFIG_LABEL_RATIO 0.25
 
-# Globals: GUI
-#:set GUI_COLOR NAVY
+# Globals: text glyphs
 #:set ARROW_DOWN "\u2193"
 #:set ARROW_LEFT "\u2190"
 #:set ARROW_RIGHT "\u2192"
@@ -48,11 +63,6 @@
 #
 # Helper Widgets
 #
-<ButtonLabel>:
-    text: "ButtonLabel"
-    # callback_press: app.btn_press
-    # callback_release: app.btn_release
-
 <MsgBoxPopup@Popup>:
     close_button: butt
     message: message
@@ -60,6 +70,7 @@
     font_name: "Arial"
     font_size: sp(15)
     title: "MsgBox"
+    title_size: self.font_size
     size_hint: None, None
     width: grid.width + dp(25)
     height: grid.height + root.title_size + dp(48)
@@ -100,13 +111,99 @@
             Button:
                 id: butt
                 text: "Close"
+                font_size: root.font_size
                 size_hint: None, None
-                # size_hint_min_x: dp(100)
-                # size: self.texture_size
                 width: self.texture_size[0] if self.texture_size[0] > 100 else 100
                 height: self.texture_size[1]
                 padding: [10, 5]
                 on_release: root.dismiss()
+
+
+[FileIconEntry@Widget]:
+    locked: False
+    path: ctx.path
+    selected: self.path in ctx.controller().selection
+    size_hint: None, None
+    on_touch_down: self.collide_point(*args[1].pos) and ctx.controller().entry_touched(self, args[1])
+    on_touch_up: self.collide_point(*args[1].pos) and ctx.controller().entry_released(self, args[1])
+    # size: '100dp', '100dp'
+    height: dp(100 * (1.0 + 0.6 * (min(Window.height / Window.minimum_height, Window.width / Window.minimum_width) - 1.0)))
+    width: self.height
+    canvas:
+        Color:
+            rgba: 1, 1, 1, 1 if self.selected else 0
+        BorderImage:
+            border: 8, 8, 8, 8
+            pos: root.pos
+            size: root.size
+            source: 'atlas://data/images/defaulttheme/filechooser_selected'
+    Image:
+        # size: '48dp', '48dp'
+        size: dp(0.5 * root.width), dp(0.5 * root.height)
+        source: 'atlas://data/images/defaulttheme/filechooser_%s' % ('folder' if ctx.isdir else 'file')
+        allow_stretch: True
+        pos: root.x + dp(0.24 * root.width), root.y + dp(0.40 * root.height)
+    Label:
+        text: ctx.name
+        font_name: ctx.controller().font_name
+        font_size: sp(self.height)
+        text_size: (root.width, self.height)    # prevent long text
+        halign: 'center'
+        shorten: True
+        # size: '100dp', '16dp'
+        size: dp(root.width), dp(0.16 * root.height)
+        pos: root.x, root.y + dp(0.16 * root.height)
+    Label:
+        text: '{}'.format(ctx.get_nice_size())
+        font_name: ctx.controller().font_name
+        font_size: sp(self.height)
+        color: .8, .8, .8, 1
+        # size: '100dp', '16sp'
+        size: dp(root.width), dp(0.16 * root.height)
+        pos: root.pos
+        halign: 'center'
+
+
+
+[FileListEntry@FloatLayout+TreeViewNode]:
+    locked: False
+    entries: []
+    path: ctx.path
+    # FIXME: is_selected is actually a read_only treeview property. In this case,
+    # however, we're doing this because treeview only has single-selection hardcoded in
+    # it. The fix to this would be to update treeview to allow multiple selection.
+    is_selected: self.path in ctx.controller().selection
+
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: dp(24 * (1.0 + 0.5 * (Window.height / Window.minimum_height - 1.0)))
+    # Don't allow expansion of the ../ node
+    is_leaf: not ctx.isdir or ctx.name.endswith('..' + ctx.sep) or self.locked
+    on_touch_down: self.collide_point(*args[1].pos) and ctx.controller().entry_touched(self, args[1])
+    on_touch_up: self.collide_point(*args[1].pos) and ctx.controller().entry_released(self, args[1])
+    BoxLayout:
+        pos: root.pos
+        size_hint_x: None
+        width: root.width - dp(10)
+        Label:
+            id: filename
+            font_size: sp(self.height * 0.8)
+            # size_hint_x: None
+            # width: root.width - sz.width   # this allows filename Label to fill width less size Label
+            text_size: self.width, None
+            halign: 'left'
+            shorten: True
+            text: ctx.name
+            font_name: ctx.controller().font_name
+        Label:
+            id: sz
+            font_size: sp(self.height * 0.8)
+            text_size: self.width, None
+            size_hint_x: None
+            width: self.texture_size[0]   # this makes the size Label to minimum width
+            text: '{}'.format(ctx.get_nice_size())
+            font_name: ctx.controller().font_name
+
 
 <FileLoadDialog>:
     BoxLayout:
@@ -118,22 +215,25 @@
         Label:
             text: id_file_chooser.path
             size_hint_y: None
-            height: sp(30)
+            height: dp(30)
         Separator:
             direction: "horizontal"
             line_color: SILVER
-        FileChooserListView:
+        FileChooserIconView:
+        # FileChooserListView:
             id: id_file_chooser
             dirselect: True
+            on_submit: app.load_file(*args)
         BoxLayout:
             size_hint_y: None
-            height: sp(30)
+            height: dp(30)
             Button:
                 text: "Cancel"
                 on_release: root.cancel()
             Button:
                 text: "Select"
-                on_release: root.select(id_file_chooser.path, id_file_chooser.selection)
+                on_release: root.select(id_file_chooser, id_file_chooser.selection)
+
 
 <FileSaveDialog>:
     text_input: text_input
@@ -144,7 +244,7 @@
         Label:
             text: id_file_chooser.path
             size_hint_y: None
-            height: sp(30)
+            height: dp(30)
         Separator:
             direction: "horizontal"
             line_color: SILVER
@@ -154,11 +254,11 @@
         TextInput:
             id: text_input
             size_hint_y: None
-            height: sp(30)
+            height: dp(30)
             multiline: False
         BoxLayout:
             size_hint_y: None
-            height: sp(30)
+            height: dp(30)
             Button:
                 text: "Cancel"
                 on_release: root.cancel()
@@ -166,12 +266,14 @@
                 text: "Save"
                 on_release: root.save(id_file_chooser.path, text_input.text)
 
+
 <Header@BoxLayout>:
+    # cannot use color constants here, will cause NoneType errors
     font_color: 1, 1, 1, 1
     header_color: 0, 0, 0, 1
     header_text: ""
     size_hint: 1, None
-    height: dp(HEADER_HEIGHT)
+    height: dp(HEADER_HEIGHT)   # updated by respective controller
     canvas:
         Color:
             rgba: self.header_color
@@ -181,34 +283,41 @@
     Label:
         color: root.font_color
         text: root.header_text
+        font_size: sp(self.height * BUTTON_FONT_SMALLER)
         bold: True
 
-<CustomSpinnerOptions@SpinnerOption>:
-    background_normal: ""
-    background_color: NAVY
-    padding: dp(10), dp(10)
-    canvas.before:
-        Color:
-            rgba: 192/255, 192/255, 192/255, 1
-        Line:
-            width: dp(1)
-            rectangle: self.x, self.y, self.width, self.height
 
 <CustomDropDown@DropDown>:
-    max_height: dp(300)
+    # max_height: dp(Window.height // 3) # todo: scale
     bar_width: dp(5)
     bar_color: GREEN
     bar_inactive_color: RED
     effect_cls: "ScrollEffect"
     scroll_type: ["bars", "content"]
 
+
+<CustomSpinnerOptions@SpinnerOption>:
+    background_normal: ""   # need this to set background_color
+    background_color: GUI_COLOR
+    font_size: sp(self.height * BUTTON_FONT_SMALLER)
+    height: dp(40 * (1.0 + 0.3 * (Window.height / Window.minimum_height - 1.0)))
+    size_hint_y: None
+    canvas.before:
+        Color:
+            rgba: SILVER
+        Line:
+            width: dp(1)
+            rectangle: self.x, self.y, self.width, self.height
+
+
 <ConfigHeader@BoxLayout>:
+    # cannot use color constants here, will cause NoneType errors
     font_color: 1, 1, 1, 1
     header_color: 0, 0, 0, 1
     node_type: ""
     node_name: ""
     size_hint: 1, None
-    height: dp(HEADER_HEIGHT)
+    height: dp(HEADER_HEIGHT)   # updated by respective controller
     state: "enabled"
     callback_node_type: app.btn_node_type_select
     callback_node_name: app.btn_node_name_select
@@ -221,35 +330,37 @@
     Label:  # spacer
         text: ""
         size_hint_x: None
-        width: dp(20)
+        width: dp(5)
     Spinner:
         id: spinner_node_type
         background_normal: ""
         background_color: root.header_color
         color: root.font_color
         bold: True
-        padding: 10, 10
-        size_hint: None, 1
         text: root.node_type
-        width: dp(100)
+        font_size: sp(self.height * BUTTON_FONT_SMALLER)
+        size_hint: None, None
+        height: root.height
+        width: dp(root.width * PIPELINE_CONFIG_LABEL_RATIO)
         on_text:
             root.callback_node_type(self) if root.state == "enabled" else ""
         # dropdown_cls: Factory.CustomDropDown
         option_cls: Factory.CustomSpinnerOptions
-    Label:
-        id: the_dot
+    Label:  # spacer
         text: ""
         size_hint_x: None
-        width: dp(10)
+        width: dp(5)
     Spinner:
         id: spinner_node_name
         background_normal: ""
         background_color: root.header_color
         color: root.font_color
         bold: True
-        size_hint: None, 1
+        font_size: sp(self.height * BUTTON_FONT_SMALLER)
         text: root.node_name
-        width: dp(200)
+        size_hint: None, None
+        height: root.height
+        width: dp(root.width * 0.20)    # hardcode 20% here
         on_text:
             root.callback_node_name(self) if root.state == "enabled" else ""
         # dropdown_cls: Factory.CustomDropDown
@@ -258,39 +369,35 @@
         text: ""
 
 
-
 <RoundedButton>:
-    orientation: "horizontal"
-    text: ""
-    text_size: sp(15)
+    tag: ""
+    background_color: TRANSPARENT
+    color: BLACK
+    font_name: "Arial"
+    font_size: sp(self.height * BUTTON_FONT_SCALE)   # scale font accordingly
+
+    # to wrap long text
+    text_size: (0.9 * self.size[0], self.size[1])
+    halign: "center"
+    valign: "middle"
+    shorten: True
+
+    on_press: self.callback_press(self)
+    on_release: self.callback_release(self)
+    # need to redirect callbacks (cannot change on_press at runtime)
     callback_press: app.btn_press
     callback_release: app.btn_release
-    tag: ""
-    Separator:
-        line_color: root.color_separator
-        width: dp(2)
-    Button:
-        id: id_btn
-        background_color: root.color_bkgd
-        color: root.color_text
-        font_name: "Arial"
-        font_size: root.text_size
-        text: root.text
-        on_press: root.callback_press(self)
-        on_release: root.callback_release(self)
-        canvas.before:
-            Color:
-                rgba: root.color_normal if self.state == "normal" else root.color_pressed
-            RoundedRectangle:
-                size: self.size
-                pos: self.pos
-                radius: [dp(10),]
-    Separator:
-        line_color: root.color_separator
-        width: dp(2)
+    canvas.before:
+        Color:
+            rgba: self.color_normal if self.state == "normal" else self.color_pressed
+        RoundedRectangle:
+            size: self.size
+            pos: self.pos
+            radius: [RADIUS,]
 
 
 <Separator@Label>:
+    # cannot use color constants here, will cause NoneType errors
     line_color: 1, 1, 1, 1
     direction: "vertical"
     size_hint: (1.0, None) if self.direction == "horizontal" else (None, 1.0)
@@ -303,13 +410,26 @@
             size: self.size
             pos: self.pos
 
+
+<Tooltip>:
+    size_hint: None, None
+    size: self.texture_size[0] + 10, self.texture_size[1] + 10
+    color: BLACK
+    canvas.before:
+        Color:
+            rgba: YELLOW
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+
 <Node>:
     button: id_button
     cols: 2
     rows: 1
     padding: [dp(NODE_PADDING), dp(NODE_PADDING), dp(NODE_PADDING), dp(NODE_PADDING)]
     size_hint: (1, None)
-    size: (0, dp(NODE_HEIGHT))
+    height: self.node_height
     callback_press: app.btn_node_press
     canvas.after:
         Color:
@@ -323,16 +443,16 @@
         width: dp(40)
         Label:
             text: root.node_number
-    Button:
+            font_size: sp(self.height * NODE_FONT_SCALE)
+    RoundedButton:
         id: id_button
         halign: "center"
         valign: "middle"
-        text_size: self.size
         text: root.node_text
-        color: 0, 0, 0, 1
-        # on_press: root.callback_press(self)
-        background_normal: ""
-        background_color: root.bkgd_color
+        font_size: sp(self.height * NODE_FONT_SCALE)
+        color: BLACK
+        color_normal: root.bkgd_color
+        color_press: root.bkgd_color
 
 
 <NodeConfig>:
@@ -340,7 +460,7 @@
     rows: 1
     padding: [dp(CONFIG_PADDING), dp(CONFIG_PADDING), dp(CONFIG_PADDING), dp(CONFIG_PADDING)]
     size_hint: (1, None)
-    size: (0, dp(CONFIG_HEIGHT))
+    height: self.node_height
     callback_press: app.btn_config_press
     callback_set_default_press: app.btn_config_set_default_press
     # for highlighting node if selected
@@ -352,33 +472,31 @@
         Rectangle:
             pos: self.pos
             size: self.size
-    BoxLayout:
+    BoxLayout:  # default/user config indicator
         orientation: "vertical"
         size_hint_x: None
-        width: dp(20)
+        width: dp((root.height - 2 * CONFIG_PADDING) / 2) - 2 * CONFIG_PADDING
         Label:
             size_hint_y: None
-            height: dp(CONFIG_HEIGHT / 4)
+            height: dp(CONFIG_PADDING + (root.height - 2 * CONFIG_PADDING) / 4)
         BoxLayout:
-            size_hint_x: None
-            width: dp(20)
             canvas.before:
                 Color:
-                    rgba: WHITE if root.config_set else GRAY
+                    rgba: WHITE
                 Rectangle:
                     pos: self.pos
                     size: self.size
                 Color:
                     rgba: BLACK
                 Rectangle:
-                    pos: self.x+dp(2), self.y+dp(2)
-                    size: self.width-dp(4), self.height-dp(4)
-                # indicator for user modified config
+                    pos: self.x + dp(0.05 * self.width), self.y + dp(0.05 * self.height)
+                    size: dp(0.9 * self.width), dp(0.9 * self.height)
+                # # indicator for user modified config
                 Color:
                     rgba: RED if root.config_readonly else YELLOW if root.config_set else BLACK
                 Rectangle:
-                    pos: self.x+dp(6), self.y+dp(10)
-                    size: self.width-dp(12), self.height-dp(20)
+                    pos: self.x + dp(0.25 * self.width), self.y + dp(0.25 * self.height)
+                    size: dp(0.5 * self.width), dp(0.5 * self.height)
             # trick to get an invisible button that can still be pressed
             Button:
                 text: "A"
@@ -386,39 +504,43 @@
                 on_press: root.callback_set_default_press(self)
         Label:
             size_hint_y: None
-            height: dp(CONFIG_HEIGHT / 4)
+            height: dp(CONFIG_PADDING + (root.height - 2 * CONFIG_PADDING) / 4)
     Separator:
         line_color: BLACK
         width: dp(5)
-    BoxLayout:
+    BoxLayout:  # config key text
         size_hint_x: None
-        width: dp(200)
+        width: dp(root.width * PIPELINE_CONFIG_LABEL_RATIO)
         Label:
             halign: "center"
             valign: "middle"
+            font_size: sp(self.height * NODE_FONT_SCALE)
             text_size: self.size
             text: root.config_key
             color: RED if root.config_readonly else WHITE
     Separator:
         line_color: BLACK
         width: dp(5)
-    FloatLayout:
-        Button:
+    FloatLayout:    # config value text
+        RoundedButton:
             id: id_btn_config
             pos_hint: {"center_x": 0.5, "center_y": 0.5}
             size_hint: (1, 1)
             halign: "center"
             valign: "middle"
-            text_size: self.size
             text: root.config_value
-            color: RED if root.config_readonly else WHITE
-            on_press: root.callback_press(self)
+            font_size: sp(self.height * NODE_FONT_SCALE)
+            color: RED if root.config_readonly else BLACK
+            color_normal: GRAY if root.config_readonly else CONFIG_COLOR
+            callback_press: root.callback_press
             overlay: root.the_overlay
+            has_tooltip: root.has_tooltip
         BoxLayout:
             id: id_overlay
             pos_hint: {"center_x": 0.5, "center_y": 0.5}
-            size_hint: (1, 1)
+            size_hint: (0.98 if Window.width > MIN_WIDTH else 0.96, 1)
             tag: "the_overlay"
+            background_color: CONFIG_COLOR
 
 
 #
@@ -433,6 +555,7 @@
         size_hint: (1, None)
         height: self.minimum_height
 
+
 <PipelineConfigScroll@ScrollView>:
     view: config_layout
     BoxLayout:
@@ -441,59 +564,123 @@
         size_hint: (1, None)
         height: self.minimum_height
 
+
 <NodeControls@BoxLayout>:
-    padding: 10
-    spacing: 10
-    RoundedButton:
-        tag: "node_add"
-        text: "+"
-        text_size: sp(20)
-        callback_press: app.btn_node_add
-    RoundedButton:
-        tag: "node_delete"
-        text: EN_DASH
-        callback_press: app.btn_node_delete
-    RoundedButton:
-        tag: "node_up"
-        text: TRIANGLE_UP
-        callback_press: app.btn_node_move_up_press
-        callback_release: app.btn_node_move_up_release
-    RoundedButton:
-        tag: "node_down"
-        text: TRIANGLE_DOWN
-        callback_press: app.btn_node_move_down_press
-        callback_release: app.btn_node_move_down_release
+    orientation: "vertical"
+    Separator:
+        direction: "horizontal"
+        line_color: TRANSPARENT
+        size_hint_y: 0.10
+    BoxLayout:
+        size_hint_y: 0.80
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(20)
+        RoundedButton:
+            tag: "node_add"
+            text: "+"
+            callback_press: app.btn_node_add
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "node_delete"
+            text: EN_DASH
+            callback_press: app.btn_node_delete
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "node_up"
+            text: TRIANGLE_UP
+            callback_press: app.btn_node_move_up_press
+            callback_release: app.btn_node_move_up_release
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "node_down"
+            text: TRIANGLE_DOWN
+            callback_press: app.btn_node_move_down_press
+            callback_release: app.btn_node_move_down_release
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(20)
+    Separator:
+        direction: "horizontal"
+        line_color: TRANSPARENT
+        size_hint_y: 0.10
+
 
 <PipelineControls@BoxLayout>:
-    padding: 6
-    spacing: 10
-    RoundedButton:
-        text: "Yaml"
-        callback_press: app.btn_yaml
+    orientation: "vertical"
+    canvas.before:
+        Color:
+            rgba: BLACK
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [RADIUS,]
     Separator:
-        line_color: GUI_COLOR
-        width: dp(1)
-    RoundedButton:
-        text: "New"
-        callback_press: app.btn_new_file
-    RoundedButton:
-        text: "Load"
-        callback_press: app.btn_load_file
-    RoundedButton:
-        text: "Save"
-        callback_press: app.btn_save_file
-    RoundedButton:
-        text: "Run"
-        callback_press: app.btn_goto_screen_playback
+        direction: "horizontal"
+        line_color: TRANSPARENT
+        size_hint_y: 0.10
+    BoxLayout:
+        size_hint_y: 0.80
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(20)
+        RoundedButton:
+            text: "New"
+            callback_press: app.btn_new_file
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            text: "Load"
+            callback_press: app.btn_load_file
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            text: "Save"
+            callback_press: app.btn_save_file
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            text: "Run"
+            callback_press: app.btn_goto_screen_playback
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            text: "Yaml"
+            callback_press: app.btn_yaml
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(30)
+        RoundedButton:
+            text: "Tester"
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            text: "About"
+            callback_press: app.btn_about
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            text: "Quit"
+            callback_press: app.btn_quit
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(20)
     Separator:
-        line_color: GUI_COLOR
-        width: dp(1)
-    RoundedButton:
-        text: "About"
-        callback_press: app.btn_about
-    RoundedButton:
-        text: "Quit"
-        callback_press: app.btn_quit
+        direction: "horizontal"
+        line_color: TRANSPARENT
+        size_hint_y: 0.10
 
 
 #
@@ -501,9 +688,10 @@
 #
 <PipelineView@BoxLayout>:
     config_state: "expand"
-    BoxLayout:
+
+    BoxLayout:  # pipeline node panel (left)
         orientation: "vertical"
-        size_hint_x: 0.4
+        size_hint_x: PIPELINE_NODE_WIDTH
         Header:
             id: pipeline_header
             header_color: GUI_COLOR
@@ -513,27 +701,29 @@
             line_color: BLACK
         PipelineNodesScroll:
             id: pipeline_nodes
-        Separator:
-            direction: "horizontal"
-            line_color: BLACK
-        NodeControls:
+        NodeControls: # pipeline editor buttons
             id: node_controls
             size_hint_y: None
-            height: dp(CONTROLS_HEIGHT)
+            height: dp(root.parent.height * BUTTON_HEIGHT_RATIO) if root.parent.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
+        Separator:
+            direction: "horizontal"
+            height: dp(0.01 * root.parent.height)
+            line_color: TRANSPARENT
 
     Separator:
         line_color: GUI_COLOR
         width: dp(5)
 
-    BoxLayout:
+    BoxLayout:  # pipeline config panel (right)
         orientation: "vertical"
         BoxLayout:
             size_hint: 1, None
-            height: dp(HEADER_HEIGHT)
+            height: dp(HEADER_HEIGHT)   # NB: need to be updated when ConfigHeader.height changes
             BoxLayout:
                 # "toggle button" to show/hide node config items
                 size_hint_x: None
-                width: dp(30)
+                # parent.height is half node height, below formula from NodeConfig, to align column 1
+                width: dp((2 * self.parent.height - 2 * CONFIG_PADDING) / 2)
                 canvas.before:
                     Color:
                         rgba: GUI_COLOR
@@ -544,7 +734,6 @@
                     color: pipeline_header.font_color
                     color_normal: GUI_COLOR
                     color_pressed: GUI_COLOR
-                    color_separator: GUI_COLOR
                     text:
                         "" if root.config_state == "" else TRIANGLE_DOWN \
                         if root.config_state == "expand" else TRIANGLE_RIGHT
@@ -565,23 +754,20 @@
 #
 # Pipeline Editor Screen Definitions
 #
-#:set ATTR_WIDTH dp(100)
 <ProjectInfo>:
-    cols: 4
+    cols: 5
     rows: 3
-    size_hint_y: None
-    height: dp(100)
-
-    # Kivy trick to span multiple GridLayout columns
+    # row 1: using Kivy trick to span multiple GridLayout columns
     FloatLayout:
         size_hint: None, None
-        size: 0, dp(40)
+        size: 0, root.height // root.rows
         BoxLayout:
             size_hint: None, None
-            size: root.width, dp(30)
+            size: root.width, root.height // root.rows
             pos_hint: {"x": 0.5, "center_y": 0.5}
             Label:
                 text:"Pipeline Info"
+                font_size: max(sp(15), sp(self.height * BUTTON_FONT_SMALLER))
     FloatLayout:
         size_hint: None, None
         size: 0, 0
@@ -591,26 +777,33 @@
     FloatLayout:
         size_hint: None, None
         size: 0, 0
-
+    FloatLayout:
+        size_hint: None, None
+        size: 0, 0
+    # row 2
     Separator:
-        line_color: BLACK
+        line_color: TRANSPARENT
         width: dp(20)
     Label:
         halign: "left"
         valign: "middle"
         text_size: self.size
         text: "Directory:"
-        size_hint_x: None
-        width: ATTR_WIDTH
+        font_size: max(sp(15), sp(self.height * BUTTON_FONT_SMALLER))
+        size_hint_x: 0.10
     Separator:
-        line_color: BLACK
+        line_color: TRANSPARENT
         width: dp(20)
     Label:
         halign: "left"
         valign: "middle"
         text_size: self.size
         text: root.directory
- 
+        font_size: max(sp(15), sp(self.height * BUTTON_FONT_SMALLER))
+    Separator:
+        line_color: TRANSPARENT
+        width: dp(20)
+    # row 3
     Separator:
         line_color: BLACK
         width: dp(20)
@@ -619,32 +812,65 @@
         valign: "middle"
         text_size: self.size
         text: "Filename:"
-        size_hint_x: None
-        width: ATTR_WIDTH
+        font_size: max(sp(15), sp(self.height * BUTTON_FONT_SMALLER))
+        size_hint_x: 0.10
     Separator:
-        line_color: BLACK
+        line_color: TRANSPARENT
         width: dp(20)
     Label:
         halign: "left"
         valign: "middle"
         text_size: self.size
         text: root.filename
+        font_size: max(sp(15), sp(self.height * BUTTON_FONT_SMALLER))
+    Separator:
+        line_color: BLACK
+        width: dp(20)
+
 
 <ScreenPipeline>:
     BoxLayout:
         orientation: "vertical"
-        ProjectInfo:
-            id: project_info
-        PipelineView:
-            id: pipeline_view
+        canvas.before:
+            Color:
+                rgba: GUI_COLOR
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        Separator:  # top margin
+            direction: "horizontal"
+            line_color: GUI_COLOR
+            height: dp(0.01 * root.height)
+        BoxLayout:
+            orientation: "vertical"
+            pos_hint: {"x":0.01}
+            size_hint_x: 0.98
+            canvas.before:
+                Color:
+                    rgba: BLACK
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [RADIUS,]
+            ProjectInfo:
+                id: project_info
+                size_hint_y: None
+                height: dp(0.12 * root.height)
+            PipelineView:
+                id: pipeline_view
         Separator:
             direction: "horizontal"
             line_color: GUI_COLOR
-            height: dp(5)
-        PipelineControls:
+            height: dp(0.01 * root.height)
+        PipelineControls:   # pipeline control buttons
             id: pipeline_controls
-            size_hint_y: None
-            height: dp(CONTROLS_HEIGHT)
+            pos_hint: {"x":0.01}
+            size_hint: 0.98, None
+            height: dp(root.height * BUTTON_HEIGHT_RATIO) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
+        Separator:  # bottom margin
+            direction: "horizontal"
+            line_color: GUI_COLOR
+            height: dp(0.01 * root.height)
 
 
 #
@@ -655,94 +881,190 @@
     cols: 1
     rows: 2
     visible: False
-    Image:
-        id: image
+    BoxLayout:
+        Image:
+            id: image
+            # experimental (doesn't work well, see python code technotes)
+            # pos_hint: {"center_x":0.5, "center_y":0.5}
+            # size_hint: (None, None)
+            # allow_stretch: True
     GridLayout:
         id: grid
-        cols: 3
+        cols: 4
         rows: 1
+        height: dp(root.height * BUTTON_HEIGHT_RATIO) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
         size_hint_y: None
-        height: dp(CONTROLS_HEIGHT)
         Label:
             id: playback_speed
             text: "Speed: 1x"
+            font_size: sp(self.height * BUTTON_FONT_SMALLER)
             opacity: 1 if root.visible else 0
-            size_hint_x: 0.2
+            size_hint_x: 0.25
         Slider: # this widget gets replaced dynamically during runtime
             id: slider
             opacity: 1 if root.visible else 0
-            size_hint_x: 0.6
+            size_hint_x: 0.5
+        Label:
+            id: frame_counter
+            text: "1"
+            font_size: sp(self.height * BUTTON_FONT_SMALLER)
+            opacity: 1 if root.visible else 0
+            size_hint_x: 0.125
         Label:
             id: zoom
             text: "Zoom: 1.0"
+            font_size: sp(self.height * BUTTON_FONT_SMALLER)
             opacity: 1 if root.visible else 0
-            size_hint_x: 0.2
+            size_hint_x: 0.125
+
 
 <PeekingDuckControls@BoxLayout>:
-    padding: 6
-    spacing: 10
-    RoundedButton:
-        tag: "go_back"
-        text: ARROW_LEFT
-        text_size: sp(20)
-        callback_press: app.btn_goto_screen_pipeline
+    orientation: "vertical"
+    canvas.before:
+        Color:
+            rgba: BLACK
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [RADIUS,]
     Separator:
-        line_color: GUI_COLOR
-    RoundedButton:
-        id: btn_replay
-        tag: "replay"
-        text: HEBREW_PE
-        text_size: sp(20)
-        callback_press: app.btn_replay_press
-    RoundedButton:
-        id: btn_play_stop
-        tag: "play"
-        text: TRIANGLE_RIGHT if self.tag == "play" else SQUARE
-        text_size: sp(20)
-        callback_press: app.btn_play_stop_press
-    RoundedButton:
-        tag: "first_frame"
-        text: LINE_VERTICAL + TRIANGLE_LEFT
-        callback_press: app.btn_first_frame
-    RoundedButton:
-        tag: "backward"
-        text: TRIANGLE_LEFT + TRIANGLE_LEFT
-        callback_press: app.btn_backward_press
-        callback_release: app.btn_backward_release
-    RoundedButton:
-        tag: "forward"
-        text: TRIANGLE_RIGHT + TRIANGLE_RIGHT
-        callback_press: app.btn_forward_press
-        callback_release: app.btn_forward_release
-    RoundedButton:
-        tag: "last_frame"
-        text: TRIANGLE_RIGHT + LINE_VERTICAL
-        callback_press: app.btn_last_frame
+        direction: "horizontal"
+        line_color: TRANSPARENT
+        size_hint_y: 0.10
+    BoxLayout:
+        size_hint_y: 0.80
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(20)
+        RoundedButton:
+            tag: "go_back"
+            text: ARROW_LEFT
+            callback_press: app.btn_goto_screen_pipeline
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            id: btn_replay
+            tag: "replay"
+            text: HEBREW_PE
+            callback_press: app.btn_replay_press
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(50)
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            id: btn_play_stop
+            tag: "play"
+            text: TRIANGLE_RIGHT if self.tag == "play" else SQUARE
+            callback_press: app.btn_play_stop_press
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "first_frame"
+            text: LINE_VERTICAL + TRIANGLE_LEFT
+            callback_press: app.btn_first_frame
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "backward"
+            text: TRIANGLE_LEFT + TRIANGLE_LEFT
+            callback_press: app.btn_backward_press
+            callback_release: app.btn_backward_release
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "forward"
+            text: TRIANGLE_RIGHT + TRIANGLE_RIGHT
+            callback_press: app.btn_forward_press
+            callback_release: app.btn_forward_release
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "last_frame"
+            text: TRIANGLE_RIGHT + LINE_VERTICAL
+            callback_press: app.btn_last_frame
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(50)
+        RoundedButton:
+            tag: "zoom_out"
+            text: "A"
+            font_size: sp(self.height * BUTTON_FONT_SMALLER)
+            callback_press: app.btn_zoom_out
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        RoundedButton:
+            tag: "zoom_in"
+            text: "A"
+            font_size: sp(self.height * BUTTON_FONT_LARGER)
+            callback_press: app.btn_zoom_in
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(20)
     Separator:
-        line_color: GUI_COLOR
-    RoundedButton:
-        tag: "zoom_out"
-        text: "A"
-        text_size: sp(10)
-        callback_press: app.btn_zoom_out
-    RoundedButton:
-        tag: "zoom_in"
-        text: "A"
-        text_size: sp(20)
-        callback_press: app.btn_zoom_in
+        direction: "horizontal"
+        line_color: TRANSPARENT
+        size_hint_y: 0.10
+
 
 <PeekingDuckView@BoxLayout>:
     orientation: "vertical"
-    Header:
-        id: pkd_header
-        header_color: GUI_COLOR
-        header_text: "PeekingDuck"
-    Output:
-        id: pkd_output
-    PeekingDuckControls:
+    canvas.before:
+        Color:
+            rgba: GUI_COLOR
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    Separator:  # top margin
+        direction: "horizontal"
+        line_color: GUI_COLOR
+        height: dp(0.01 * root.height)
+    BoxLayout:
+        orientation: "vertical"
+        pos_hint: {"x": 0.01}
+        size_hint_x: 0.98
+        canvas.before:
+            Color:
+                rgba: BLACK
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [RADIUS,]
+        BoxLayout:
+            size_hint_y: None
+            height: dp(HEADER_HEIGHT)   # need to be updated when pkd_header.height changes
+            Separator:
+                line_color: TRANSPARENT
+                width: dp(20)
+            Header:
+                id: pkd_header
+                header_text: "PeekingDuckStudio"
+            Separator:
+                line_color: TRANSPARENT
+                width: dp(20)
+        Output:
+            id: pkd_output
+    Separator:
+        direction: "horizontal"
+        line_color: GUI_COLOR
+        height: dp(0.01 * root.height)
+    PeekingDuckControls:    # output playback buttons
         id: pkd_controls
-        size_hint_y: None
-        height: dp(CONTROLS_HEIGHT)
+        height: dp(root.height * BUTTON_HEIGHT_RATIO) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
+        pos_hint: {"x": 0.01}
+        size_hint: 0.98, None
+    Separator:  # bottom margin
+        direction: "horizontal"
+        line_color: GUI_COLOR
+        height: dp(0.01 * root.height)
+
 
 <ScreenPlayback>:
     BoxLayout:

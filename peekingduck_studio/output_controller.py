@@ -2,26 +2,32 @@
 # PeekingDuck Studio Controller for Output Playback
 #
 
-from contextlib import redirect_stderr, redirect_stdout
+from typing import Tuple
+from contextlib import redirect_stderr
 import copy
 import cv2
 from io import StringIO
 import numpy as np
 import os
+import yaml
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from tempfile import TemporaryDirectory
 from peekingduck.declarative_loader import DeclarativeLoader
 from peekingduck.pipeline.pipeline import Pipeline
+from peekingduck_studio.colors import RED, GREEN, WHITE
 from peekingduck_studio.config_parser import NodeConfigParser
-from peekingduck_studio.pipeline_model import ModelPipeline
-from peekingduck_studio.gui_widgets import Output, MsgBox
+from peekingduck_studio.model_pipeline import ModelPipeline
+from peekingduck_studio.gui_widgets import Output, MsgBox, NODE_HEIGHT
+from peekingduck_studio.gui_utils import make_logger
 
 PLAYBACK_INTERVAL = 1 / 60
-ZOOMS = [0.5, 0.75, 1.0, 1.25, 1.50, 2.00]
+ZOOMS = [0.5, 0.75, 1.0, 1.25, 1.50, 2.00, 2.50, 3.00]  # > 3x is slow!
 # Test unicode glyphs for zoom factors
 # ZOOM_TEXT = ["\u00BD", "\u00BE", "1.0", "1\u00BC", "1\u00BD", "2.0"]
-ZOOM_TEXT = ["0.5", "0.75", "1.0", "1.25", "1.50", "2.0"]
+ZOOM_TEXT = ["0.5x", "0.75x", "1x", "1.25x", "1.5x", "2x", "2.5x", "3x"]
+
+logger = make_logger(__name__)
 
 
 class OutputController:
@@ -32,19 +38,30 @@ class OutputController:
         self.output_layout: Output = pkd_view.ids["pkd_output"]
         self.controls = pkd_view.ids["pkd_controls"]
         self.play_stop_btn_parent = self.controls.ids["btn_play_stop"]
-        self.output = self.output_layout.ids["image"]
+        self.output_image = self.output_layout.ids["image"]
         self.progress = None
         self.slider = self.output_layout.ids["slider"]
+        self.frame_counter = self.output_layout.ids["frame_counter"]
         self.zoom = self.output_layout.ids["zoom"]
         # make output display black (else it will be white by default)
         black_frame = np.empty((768, 1024, 3))
-        self.blitz_texture(black_frame)
         self.zoom_idx = 2  # default 100% zoom
+        self.blitz_texture(black_frame)
         # pipeline control vars
         self.pipeline_model: ModelPipeline = None
         self.frames = None
         self._pipeline_running = False
         self._output_playback = False
+        self._node_height: int = NODE_HEIGHT
+
+    @property
+    def node_height(self) -> int:
+        return self._node_height
+
+    @node_height.setter
+    def node_height(self, height: int) -> None:
+        self._node_height = max(80, height)
+        self.update_nodes()
 
     @property
     def pipeline_running(self) -> bool:
@@ -53,8 +70,10 @@ class OutputController:
     def output_playback(self) -> bool:
         return self._output_playback
 
-    def set_output_header(self, text: str) -> None:
+    def set_output_header(self, text: str, color: Tuple = None) -> None:
         self.output_header.header_text = text
+        if color:
+            self.output_header.font_color = color
 
     def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         self.pipeline_model = pipeline_model
@@ -68,16 +87,19 @@ class OutputController:
 
     def play_stop(self) -> None:
         tag = self.play_stop_btn_parent.tag
-        print(f"play_stop: tag={tag}")
+        logger.debug(f"tag={tag}")
         if tag == "play":
             self.set_play_stop_btn_to_stop()
             if self.pipeline_model.dirty:
-                # play modified pipeline
-                pipeline_str = self.pipeline_model.get_string_representation()
-                self.run_pipeline_start(pipeline_str)
+                self.set_output_header(
+                    f"Running {self.pipeline_model.filename}", color=RED
+                )
+                self.run_pipeline_start()  # play modified pipeline
             else:
-                # play last unmodified pipeline
-                self.do_playback()
+                self.set_output_header(
+                    f"Replaying {self.pipeline_model.filename}", color=GREEN
+                )
+                self.do_playback()  # play last unmodified pipeline
         else:
             self.set_play_stop_btn_to_play()
             if self._pipeline_running:
@@ -116,6 +138,7 @@ class OutputController:
 
     def set_play_stop_btn_to_play(self) -> None:
         self.play_stop_btn_parent.tag = "play"
+        self.set_output_header(self.pipeline_model.filename, color=WHITE)
 
     def set_play_stop_btn_to_stop(self) -> None:
         self.play_stop_btn_parent.tag = "stop"
@@ -165,7 +188,8 @@ class OutputController:
         self.progress = self.output_layout.ids["progress"]
         self.progress.max = self.num_frames
         self.progress.value = 0
-        print(f"enable_progress: max={self.progress.max}")
+        logger.debug(f"max={self.progress.max}")
+        self.frame_counter.opacity = 1.0
 
     def disable_slider(self) -> None:
         self.slider.opacity = 0.0
@@ -179,9 +203,10 @@ class OutputController:
         self.slider.value = self.frame_idx
         self.slider.value_track = True
         self.slider.bind(value=self.slider_value_changed)
+        self.frame_counter.opacity = 1.0
 
     def slider_value_changed(self, instance, value) -> None:
-        # print(f"slider_value_changed: value={value}")
+        # logger.debug(f"value={value}")
         self.frame_idx = value - 1
         self.show_frame()
 
@@ -194,20 +219,23 @@ class OutputController:
     ####################
     # Pipeline execution
     ####################
-    def run_pipeline_start(
-        self, pipeline_str: str, custom_nodes_parent_subdir=None
-    ) -> None:
+    def run_pipeline_start(self, custom_nodes_parent_subdir="src") -> None:
         def parse_streams(strio: StringIO) -> str:
             msg = strio.getvalue()
             msg = os.linesep.join([s for s in msg.splitlines() if s])
             return msg
 
         exc_msg: str = ""
-        _out = StringIO()
+        # _out = StringIO()
         _err = StringIO()
-        with redirect_stderr(_err), redirect_stdout(_out):
+        # with redirect_stderr(_err), redirect_stdout(_out):
+        with redirect_stderr(_err):
             try:
-                self.load_pipeline(pipeline_str, custom_nodes_parent_subdir)
+                pipeline_str = self.pipeline_model.get_string_representation()
+                working_dir = self.pipeline_model.fileparent
+                self.load_pipeline(
+                    pipeline_str, working_dir, custom_nodes_parent_subdir
+                )
                 self.frames = []
                 self.frame_idx = -1
                 self.disable_slider()
@@ -216,18 +244,21 @@ class OutputController:
                 Clock.schedule_once(self.run_one_pipeline_iteration, PLAYBACK_INTERVAL)
             except BaseException as e:
                 self.set_play_stop_btn_to_play()
-                print("PeekingDuck Error!")
-                exc_msg = str(e)
-                print("exc_msg:", len(exc_msg))
-                print(exc_msg)
+                logger.exception("PeekingDuck Error!")
+                # exc_msg = str(e)
+                # logger.debug(f"exc_msg: {len(exc_msg)}")
+                # logger.debug(exc_msg)
 
         err_msg = parse_streams(_err)
-        out_msg = parse_streams(_out)
-        print("err_msg:", len(err_msg), "\n", err_msg)
-        print("exc_msg:", len(exc_msg), "\n", exc_msg)
-        print("out_msg:", len(out_msg), "\n", out_msg)
+        # out_msg = parse_streams(_out)
+        logger.debug(f"err_msg: {len(err_msg)}")
+        logger.debug(err_msg)
+        logger.debug(f"exc_msg: {len(exc_msg)}")
+        logger.debug(exc_msg)
+        # logger.debug(f"out_msg: {len(out_msg)}")
+        # logger.debug(out_msg)
 
-        if exc_msg or err_msg:
+        if exc_msg:
             the_msg = err_msg if err_msg else exc_msg
             msgbox = MsgBox("PeekingDuck Runtime Error", the_msg, "Ok")
             msgbox.show()
@@ -235,7 +266,7 @@ class OutputController:
     def run_pipeline_done(self, *args) -> None:
         # clean up nodes with threads
         for node in self.pipeline.nodes:
-            if node.name.endswith(".visual"):
+            if node.name.endswith("input.visual"):
                 node.release_resources()
         self.set_play_stop_btn_to_play()
         self._pipeline_running = False
@@ -269,7 +300,7 @@ class OutputController:
                 if node.name.endswith("output.screen"):
                     # intercept screen output to Kivy
                     img = self.pipeline.data["img"]
-                    # opencv top-left = (0,0), kivy bottom-left = (0,0)
+                    # (0,0) == opencv top-left == kivy bottom-left
                     frame = cv2.flip(img, 0)  # flip around x-axis
                     self.frames.append(frame)  # save frame for playback
                     self.frame_idx += 1
@@ -295,8 +326,8 @@ class OutputController:
             else:
                 Clock.schedule_once(self.run_pipeline_done, PLAYBACK_INTERVAL)
         except BaseException as e:
-            print("PeekingDuck Error!")
-            print(e)
+            logger.exception("PeekingDuck Error!")
+            # logger.debug(e)
             self.run_pipeline_done()
             self.disable_slider()
             self.pipeline_model.set_dirty_bit()  # but all is not well
@@ -307,20 +338,27 @@ class OutputController:
     def show_frame(self) -> None:
         if self.frames:
             frame = self.frames[self.frame_idx]
-            frame = self.apply_zoom(frame)
+            frame = self.apply_zoom(frame)  # note: can speed up zoom?
             self.blitz_texture(frame)
             # mimic an observer pattern-like behavior...
             # not as cool as binding slider.value directly to self.frame_idx :(
-            self.slider.value = self.frame_idx + 1
+            frame_count = self.frame_idx + 1
+            self.slider.value = frame_count
+            self.frame_counter.text = str(frame_count)
 
     def apply_zoom(self, frame: np.ndarray) -> np.ndarray:
-        # print(f"zoom_idx={self.zoom_idx}")
+        # logger.debug(f"zoom_idx={self.zoom_idx}")
         if self.zoom_idx != 2:
             # zoom image
             zoom = ZOOMS[self.zoom_idx]
-            # print(f"img.shape = {img.shape}, zoom = {zoom}")
-            new_size = (int(frame.shape[0] * zoom), int(frame.shape[1] * zoom))
-            # print(f"zoom image to {new_size}")
+            # logger.debug(f"img.shape = {img.shape}, zoom = {zoom}")
+            new_size = (
+                int(frame.shape[0] * zoom),
+                int(frame.shape[1] * zoom),
+                frame.shape[2],
+            )
+            # logger.debug(f"zoom image to {new_size}")
+            # note: opencv is faster than scikit-image!
             frame = cv2.resize(frame, (new_size[1], new_size[0]))
         return frame
 
@@ -329,20 +367,64 @@ class OutputController:
         framebuffer = bytes(frame)
         texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt="bgr")
         texture.blit_buffer(framebuffer, colorfmt="bgr", bufferfmt="ubyte")
-        self.output.texture = texture
+        self.output_image.texture = texture
 
-    def load_pipeline(self, pipeline_str: str, custom_nodes_parent_subdir: str) -> None:
-        print(f"pipeline={pipeline_str}")
-        with TemporaryDirectory() as tempdir:
-            print(f"tempdir={tempdir}")
+        # # apply built-in zoom (experimental)
+        # # dotw: doesn't work well 'coz image texture is rendered first on-screen, then
+        # #       moved to its correct position, i.e. results in bad flicker!
+        # zoom = ZOOMS[self.zoom_idx]
+        # new_size = (int(frame.shape[1] * zoom), int(frame.shape[0] * zoom))
+        # parent = self.output_image.parent
+        # parent_size = parent.size
+        # image_size = (
+        #     min(new_size[0], parent_size[0]),
+        #     min(new_size[1], parent_size[1]),
+        # )
+        # self.output_image.size = image_size
+        # # logger.debug(f"image size: {self.output_image.size} in {type(parent)} {parent_size}")
+
+    def load_pipeline(
+        self, pipeline_str: str, working_dir: str, custom_nodes_parent_subdir: str
+    ) -> None:
+        """Convert YAML pipeline into internal Pipeline object by saving it into a temp
+        'pipeline.yml' file and loading that using PeekingDuck's DeclarativeLoader class.
+
+        Args:
+            pipeline_str (str): YAML representation of pipeline
+            working_dir (str): pipeline working directory
+            custom_nodes_parent_subdir (str): folder containing custom nodes
+        """
+        if working_dir != ".":
+            os.chdir(working_dir)
+        # logger.debug(f"pipeline={pipeline_str}")
+        # logger.debug(f"working_dir={working_dir}, cwd={os.getcwd()}")
+
+        with TemporaryDirectory(dir=working_dir) as tempdir:
+            logger.debug(f"tempdir={tempdir}")
             pipeline_path = os.path.join(tempdir, "pipeline.yml")
             with open(pipeline_path, "w") as tempfile:
                 tempfile.writelines(pipeline_str)
-            # print("tempfile contents:")
-            # with open(tempfilename, "r") as tempfile:
-            #     print(tempfile.readline())
+            # # debug tempfile contents
+            # logger.debug("tempfile:")
+            # with open(pipeline_path, "r") as tempfile:
+            #     logger.debug(tempfile.readline())
+            # logger.debug("----------")
+            # yaml safe load
+            logger.debug("yaml")
+            with open(pipeline_path, "r") as tempfile:
+                the_yaml = yaml.safe_load(tempfile)
+            logger.debug(the_yaml)
+            logger.debug("-----")
+            ss = yaml.dump(the_yaml, default_flow_style=None)
+            logger.debug(ss)
+            logger.debug("-----")
             self.node_loader = DeclarativeLoader(
                 pipeline_path, "None", custom_nodes_parent_subdir
             )
             self.pipeline: Pipeline = self.node_loader.get_pipeline()
-            print(f"self.pipeline: {self.pipeline}")
+            logger.debug(f"self.pipeline: {self.pipeline}")
+
+    def update_nodes(self) -> None:
+        """Update UI properties of playback screen"""
+        self.output_header.height = self.node_height // 2
+        self.output_header.parent.height = self.output_header.height

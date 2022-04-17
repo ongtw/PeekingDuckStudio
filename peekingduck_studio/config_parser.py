@@ -2,33 +2,29 @@
 # PeekingDuck Studio Parser for Node Configuration
 #
 from typing import Any, Dict, List
-import peekingduck
-import yaml
-from pathlib import Path
-from peekingduck_studio.pipeline_model import ModelNode
+from peekingduck_studio.gui_utils import (
+    CUSTOM_NODES,
+    get_peekingduck_path,
+    find_config_dirs,
+    parse_configs,
+    guess_config_value_types,
+    make_logger,
+)
+from peekingduck_studio.model_node import ModelNode
+from peekingduck_studio.model_pipeline import ModelPipeline
 
-NODE_CONFIG_READONLY_KEYS = {"input", "output", "model_size"}
-NODE_CONFIG_RESERVED_KEYS = {"MODEL_NODES", "weights", "weights_parent_dir"}
-
-
-def get_peekingduck_path() -> Path:
-    pkd_path = peekingduck.__path__[0]
-    return Path(pkd_path)
+logger = make_logger(__name__)
 
 
 class NodeConfigParser:
     def __init__(self) -> None:
         self.pkd_path = get_peekingduck_path()
         self.config_path = self.pkd_path / "configs"
-        self.find_config_dirs()
-        self.parse_default_configs()
-        self.guess_default_config_value_types()
-
-    def find_config_dirs(self) -> None:
-        """Get directories containing PeekingDuck configs"""
-        files = self.config_path.glob("*")
-        self.config_dirs = sorted([file for file in files if file.is_dir()])
-        print("config_dirs:", self.config_dirs)
+        self.config_dirs = find_config_dirs(self.config_path)
+        logger.debug(f"config_dirs: {self.config_dirs}")
+        self.nodes_by_type, self.default_config_map = parse_configs(self.config_dirs)
+        self.default_config_types = guess_config_value_types(self.default_config_map)
+        self.pipeline_model: ModelPipeline = None
 
     def get_default_configs(self, node_title: str) -> Dict:
         """Return the default set of configuration for given node
@@ -39,7 +35,14 @@ class NodeConfigParser:
         Returns:
             Dict: the node's default configurations
         """
-        return self.default_config_map[node_title]
+        logger.debug(f"node_title: {node_title}")
+        return (
+            self.pipeline_model.custom_nodes_default_config_map[
+                node_title[1 + len(CUSTOM_NODES) :]
+            ]
+            if node_title.startswith(CUSTOM_NODES)
+            else self.default_config_map[node_title]
+        )
 
     def get_default_config_type(self, node_title: str, config_key: str) -> str:
         """Return the type for given node title's config key based on its default value
@@ -51,7 +54,14 @@ class NodeConfigParser:
         Returns:
             str: the default type
         """
-        default_types = self.default_config_types[node_title]
+        logger.debug(f"node_title: {node_title} config_key: {config_key}")
+        default_types = (
+            self.pipeline_model.custom_nodes_default_config_types[
+                node_title[1 + len(CUSTOM_NODES) :]
+            ]
+            if node_title.startswith(CUSTOM_NODES)
+            else self.default_config_types[node_title]
+        )
         config_type = default_types[config_key]
         return config_type
 
@@ -65,8 +75,16 @@ class NodeConfigParser:
         Returns:
             Any: the default value
         """
-        default_config = self.default_config_map[node_title]
+        logger.debug(f"node_title: {node_title} config_key: {config_key}")
+        default_config = (
+            self.pipeline_model.custom_nodes_default_config_map[
+                node_title[1 + len(CUSTOM_NODES) :]
+            ]
+            if node_title.startswith(CUSTOM_NODES)
+            else self.default_config_map[node_title]
+        )
         default_val = default_config[config_key]
+        logger.debug(f"default_val: {default_val}")
         return default_val
 
     def get_all_config_keys(self, node_title: str) -> List[str]:
@@ -78,12 +96,21 @@ class NodeConfigParser:
         Returns:
             List[str]: list of config keys
         """
-        default_config = self.default_config_map[node_title]
+        logger.debug(f"node_title: {node_title}")
+        default_config = (
+            self.pipeline_model.custom_nodes_default_config_map[
+                node_title[1 + len(CUSTOM_NODES) :]
+            ]
+            if node_title.startswith(CUSTOM_NODES)
+            else self.default_config_map[node_title]
+        )
         keys = list(default_config.keys())
+        logger.debug(f"keys: {keys}")
         return keys
 
     def get_all_node_types(self) -> List[str]:
         """Return list of all node types
+        NB: no custom nodes, just the default PeekingDuck node types
 
         Returns:
             List[str]: list of all node types
@@ -92,6 +119,7 @@ class NodeConfigParser:
 
     def get_all_node_titles(self, node_type: str) -> List[str]:
         """Return list of all node titles for given node type
+        NB: include custom nodes, if any, prefix with `custom_nodes.`
 
         Args:
             node_type (str): given node type
@@ -99,96 +127,40 @@ class NodeConfigParser:
         Returns:
             List[str]: list of all node titles
         """
-        return self.nodes_by_type[node_type]
+        # make a copy 'coz list is mutated by custom nodes, if any
+        all_node_titles = self.nodes_by_type[node_type].copy()
+        if self.pipeline_model and self.pipeline_model.has_custom_nodes:
+            if node_type in self.pipeline_model.custom_nodes_by_type:
+                all_node_titles.extend(
+                    [
+                        f"{CUSTOM_NODES}.{x}"
+                        for x in self.pipeline_model.custom_nodes_by_type[node_type]
+                    ]
+                )
+        logger.debug(f"node_type: {node_type} all_node_titles: {all_node_titles}")
+        return all_node_titles
 
-    def guess_config_type(self, key: str, val: Any) -> str:
-        """Guesstimate the type for given config key based on given value
+    def is_custom_node(self, node_title: str) -> bool:
+        """Query if given node_title is a custom node
 
         Args:
-            key (str): given config key
-            val (Any): given value
+            node_title (str): node title to query
 
         Returns:
-            str: the type
+            bool: True if is custom node, False otherwise
         """
-        # guesstimate value type
-        the_type: str = "str"
-        if key in NODE_CONFIG_READONLY_KEYS:
-            the_type = "readonly"
-        elif isinstance(val, bool):
-            the_type = "bool"
-        elif isinstance(val, int):
-            the_type = "int"
-        elif isinstance(val, float):
-            if 0 <= val <= 1.0 and key.endswith(("_factor", "_threshold")):
-                the_type = "float_01"
-            else:
-                the_type = "float"
-        elif isinstance(val, dict):
-            if len(val) == 2 and key.endswith("resolution"):
-                the_type = "dict_wh"
-            else:
-                the_type = "dict"
-        elif isinstance(val, list):
-            if len(val) == 2 and key.endswith("resolution"):
-                the_type = "list_wh"
-            elif len(val) == 3 and key.endswith("_color"):
-                the_type = "list_bgr"
-            else:
-                the_type = "list"
-        elif isinstance(val, str):
-            if key.endswith("_path"):
-                the_type = "str_path"
-            else:
-                the_type = "str"
-        else:
-            the_type = "nonetype"
-        return the_type
+        logger.debug(f"node_title: {node_title}")
+        if self.pipeline_model and self.pipeline_model.has_custom_nodes:
+            return node_title in self.pipeline_model.custom_nodes_default_config_map
+        return False
 
-    def guess_default_config_value_types(self) -> None:
-        """Guesstimate and store all default config value types"""
-        default_config_types = {}  # map node_title -> { config_key -> config_type }
-        for node_title, default_config in self.default_config_map.items():
-            print(f"{node_title}")
-            config_type_map = {}  # map config_key -> config_type
-            for k, v in default_config.items():
-                # skip reserved keys
-                if k in NODE_CONFIG_RESERVED_KEYS:
-                    continue
-                config_type = self.guess_config_type(k, v)
-                print(f"  {k}: {config_type} = {v}")
-                config_type_map[k] = config_type
-            default_config_types[node_title] = config_type_map
-        # print(default_config_types)
-        self.default_config_types = default_config_types
+    def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
+        """Cache ModelPipeline object within self
 
-    def parse_default_configs(self) -> None:
-        """Parse PeekingDuck node default configurations"""
-        # map node type -> list of node titles
-        self.nodes_by_type: Dict[str, List[str]] = dict()
-        # map node title -> node config
-        self.default_config_map: Dict[str, Dict[str, Any]] = dict()
-
-        for config in self.config_dirs:
-            node_type = config.name
-            # print(f"** node_type={node_type}")
-            files = sorted(config.glob("*.yml"))
-            # working data structures
-            node_title_list = []
-
-            for config_file in files:
-                node_name = config_file.name[:-4]
-                node_title = f"{node_type}.{node_name}"
-                # print("  ", node_name)
-                with open(config_file) as file:
-                    node_config = yaml.safe_load(file)
-                # print(f"-- {node_title} config:{type(node_config)}")
-                # print(node_config)
-
-                self.default_config_map[node_title] = node_config
-                node_title_list.append(node_title)
-
-            self.nodes_by_type[node_type] = node_title_list
+        Args:
+            pipeline_model (ModelPipeline): the pipeline model
+        """
+        self.pipeline_model = pipeline_model
 
     def verify_config(self, idx_to_node: List[ModelNode]) -> List:
         """Return a list of pipeline errors, if any
@@ -205,9 +177,9 @@ class NodeConfigParser:
             data_types_available = set()
             for i, node in enumerate(idx_to_node):
                 node_title = node.node_title
-                print(f"verifying {node_title}...")
+                logger.debug(f"verifying {node_title}...")
                 if node_title.startswith("custom_nodes."):
-                    print("skipping custom node")
+                    logger.debug("skipping custom node")
                     continue  # ignore custom nodes for now...
                 # todo: support custom nodes
                 node_config = self.default_config_map[node_title]
@@ -218,8 +190,8 @@ class NodeConfigParser:
                 for the_input in node_input:
                     if the_input not in ["all", "none"]:
                         if the_input not in data_types_available:
-                            print(f"data_types: {data_types_available}")
-                            print(f"'{the_input}' not available")
+                            logger.debug(f"data_types: {data_types_available}")
+                            logger.debug(f"'{the_input}' not available")
                             node_error.append(the_input)
                 if node_error:
                     pipeline_errors.append([i, node_error])
@@ -232,13 +204,13 @@ class NodeConfigParser:
 
     def debug_configs(self):
         for node_type, node_list in self.nodes_by_type.items():
-            print(f"node_type={node_type}")
+            logger.debug(f"node_type={node_type}")
 
             for node_title in node_list:
                 node_name = node_title.split(".")[1]
                 node_config = self.default_config_map[node_title]
-                print(f"node_title={node_title}, node_name={node_name}")
-                print(node_config)
+                logger.debug(f"node_title={node_title}, node_name={node_name}")
+                logger.debug(node_config)
 
 
 def main():
@@ -246,10 +218,10 @@ def main():
     # config_parser.guess_config_value_types()
     # config_parser.debug_configs()
     # all_node_types = config_parser.get_all_node_types()
-    # print(f"all node types: {all_node_types}")
+    # logger.debug(f"all node types: {all_node_types}")
     # for node_type in all_node_types:
     #     all_node_names = config_parser.get_all_node_titles(node_type)
-    #     print(f"{node_type}: {all_node_names}")
+    #     logger.debug(f"{node_type}: {all_node_names}")
 
 
 if __name__ == "__main__":
