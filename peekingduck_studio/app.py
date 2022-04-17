@@ -51,6 +51,8 @@ from kivy.config import Config
 from kivy.metrics import Metrics
 
 # change window size from 800x600 to 1024x768 (must be done before importing other kivy modules)
+WIN_WIDTH: int = 1280
+WIN_HEIGHT: int = 800
 Config.set("graphics", "width", WIN_WIDTH)
 Config.set("graphics", "height", WIN_HEIGHT)
 Config.set("graphics", "minimum_width", WIN_WIDTH)
@@ -101,8 +103,6 @@ ROOT_PATH = "/"
 CURR_PATH = str(Path.home())
 DIR_FILTERS = [""]
 FILE_FILTERS = ["*yml"]
-WIN_WIDTH: int = 1280
-WIN_HEIGHT: int = 800
 BUTTON_DELAY: float = 0.2
 PLAYBACK_DELAY: float = 0.01
 
