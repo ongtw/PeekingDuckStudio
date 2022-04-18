@@ -207,9 +207,24 @@ class ModelPipeline:
         # decode pipeline nodes
         for i, node in enumerate(pipeline):
             if isinstance(node, str):
+                if node in ["input.live", "input.recorded"]:
+                    logger.warning(f"{node} is replaced by 'input.visual'")
+                    node = "input.visual"
                 node_title = node
                 user_config = NO_USER_CONFIG
             elif isinstance(node, dict):
+                if "input.live" in node:
+                    logger.warning(f"'input.live' is replaced by 'input.visual'")
+                    old_config = node.pop("input.live")
+                    if "input_source" in old_config:
+                        old_config["source"] = old_config.pop("input_source")
+                    node["input.visual"] = old_config
+                if "input.recorded" in node:
+                    logger.warning(f"'input.recorded' is replaced by 'input.visual'")
+                    old_config = node.pop("input.recorded")
+                    if "input_dir" in old_config:
+                        old_config["source"] = old_config.pop("input_dir")
+                    node["input.visual"] = old_config
                 node_title = list(node.keys())[0]
                 user_config = []
                 config_dd = node[node_title]
