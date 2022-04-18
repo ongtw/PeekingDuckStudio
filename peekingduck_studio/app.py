@@ -53,6 +53,7 @@ from kivy.metrics import Metrics
 # change window size from 800x600 to 1024x768 (must be done before importing other kivy modules)
 WIN_WIDTH: int = 1280
 WIN_HEIGHT: int = 800
+Config.set("kivy", "window_icon", "pkds_mac.png")
 Config.set("graphics", "width", WIN_WIDTH)
 Config.set("graphics", "height", WIN_HEIGHT)
 Config.set("graphics", "minimum_width", WIN_WIDTH)
@@ -116,6 +117,7 @@ class PeekingDuckStudioApp(App):
         Main Kivy application entry point
         """
         self.title = "PeekingDuck Studio v1.0b (Internal Preview)"
+        # self.icon = "pkds_mac.png"
 
         sm = ScreenManager()
         self.screen_pipeline = ScreenPipeline(name="screen_pipeline")

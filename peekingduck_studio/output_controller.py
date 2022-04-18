@@ -4,6 +4,7 @@
 
 from typing import Tuple
 from contextlib import redirect_stderr
+from pathlib import Path
 import copy
 import cv2
 from io import StringIO
@@ -396,6 +397,8 @@ class OutputController:
         """
         if working_dir != ".":
             os.chdir(working_dir)
+        else:
+            working_dir = str(Path.home())
         # logger.debug(f"pipeline={pipeline_str}")
         # logger.debug(f"working_dir={working_dir}, cwd={os.getcwd()}")
 

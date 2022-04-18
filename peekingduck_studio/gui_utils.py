@@ -3,7 +3,9 @@
 #
 from typing import Any, Dict, List, Tuple
 import logging
+import os
 from pathlib import Path
+import platform
 import yaml
 from kivy.animation import Animation
 from kivy.uix.widget import Widget
@@ -31,10 +33,26 @@ NODE_CONFIG_RESERVED_KEYS = {
 }
 CUSTOM_NODES = "custom_nodes"
 
+
+def _get_path(filename: str):
+    name = os.path.splitext(filename)[0]
+    ext = os.path.splitext(filename)[1]
+
+    if platform.system() == "Darwin":
+        from AppKit import NSBundle
+
+        file = NSBundle.mainBundle().pathForResource_ofType_(name, ext)
+        return file or os.path.realpath(filename)
+    return os.path.realpath(filename)
+
+
+USER_HOME = Path.home()
+
 #
 # Helper method to make a Logger object
 #
-LOG_FILE = "peekingduckstudio_log.txt"
+LOG_FILE = _get_path(f"{USER_HOME}/peekingduckstudio_log.txt")
+# print(f"LOG_FILE={LOG_FILE}")
 LOG_FORMAT_FILE = "%(filename)s:%(lineno)s - %(funcName)s() - %(message)s"
 LOG_FORMAT_IO = "%(name)s - %(levelname)s - %(message)s"
 
