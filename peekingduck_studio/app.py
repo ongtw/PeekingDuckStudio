@@ -115,7 +115,7 @@ class PeekingDuckStudioApp(App):
         """
         Main Kivy application entry point
         """
-        self.title = "PeekingDuck Studio"
+        self.title = "PeekingDuck Studio v1.0b (Internal Preview)"
 
         sm = ScreenManager()
         self.screen_pipeline = ScreenPipeline(name="screen_pipeline")
@@ -379,7 +379,7 @@ class PeekingDuckStudioApp(App):
         """
         title = "About PeekingDuck Studio"
         msg = """
-PeekingDuck Studio v1.0
+PeekingDuck Studio v1.0b (Internal Preview)
 by David Ong Tat-Wee
 (C) 2022
 
