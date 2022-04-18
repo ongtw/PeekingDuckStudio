@@ -386,7 +386,6 @@ by David Ong Tat-Wee
 PeekingDuck Atelier:
 - pipeline editor
 - playback viewer
-- performance evaluator (coming soon)
 
 A multiple-nights/weekends project using Python and Kivy
         """
