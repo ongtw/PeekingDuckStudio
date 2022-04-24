@@ -10,6 +10,7 @@ import cv2
 from io import StringIO
 import numpy as np
 import os
+import traceback
 import yaml
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
@@ -28,6 +29,20 @@ ZOOMS = [0.5, 0.75, 1.0, 1.25, 1.50, 2.00, 2.50, 3.00]  # > 3x is slow!
 ZOOM_TEXT = ["0.5x", "0.75x", "1x", "1.25x", "1.5x", "2x", "2.5x", "3x"]
 
 logger = make_logger(__name__)
+
+
+def parse_streams(strio: StringIO) -> str:
+    """Helper method to parse I/O streams
+
+    Args:
+        strio (StringIO): the I/O stream to parse
+
+    Returns:
+        str: parsed stream
+    """
+    msg = strio.getvalue()
+    msg = os.linesep.join([s for s in msg.splitlines() if s])
+    return msg
 
 
 class OutputController:
@@ -266,12 +281,6 @@ class OutputController:
             custom_nodes_parent_subdir (str, optional): custom nodes folder.
                                                         Defaults to "src".
         """
-
-        def parse_streams(strio: StringIO) -> str:
-            msg = strio.getvalue()
-            msg = os.linesep.join([s for s in msg.splitlines() if s])
-            return msg
-
         exc_msg: str = ""
         # _out = StringIO()
         _err = StringIO()
@@ -292,20 +301,21 @@ class OutputController:
             except BaseException as e:
                 self.set_play_stop_btn_to_play()
                 logger.exception("PeekingDuck Error!")
-                exc_msg = str(e)
+                # exc_msg = str(e)
+                exc_msg = traceback.format_exc()
                 # logger.debug(f"exc_msg: {len(exc_msg)}")
                 # logger.debug(exc_msg)
 
-        err_msg = parse_streams(_err)
         # out_msg = parse_streams(_out)
-        logger.debug(f"err_msg: {len(err_msg)}")
-        logger.debug(err_msg)
-        logger.debug(f"exc_msg: {len(exc_msg)}")
-        logger.debug(exc_msg)
         # logger.debug(f"out_msg: {len(out_msg)}")
         # logger.debug(out_msg)
-
+        err_msg = parse_streams(_err)
+        if err_msg:
+            logger.debug(f"err_msg: {len(err_msg)}")
+            logger.debug(err_msg)
         if exc_msg:
+            logger.debug(f"exc_msg: {len(exc_msg)}")
+            logger.debug(exc_msg)
             the_msg = err_msg if err_msg else exc_msg
             msgbox = MsgBox("PeekingDuck Runtime Error", the_msg, "Ok")
             msgbox.show()
@@ -325,61 +335,78 @@ class OutputController:
     def run_one_pipeline_iteration(self, *args) -> None:
         """Execute one iteration of the pipeline"""
         # todo: capture runtime error msgs here
-        try:
-            self._pipeline_running = True
-            for node in self.pipeline.nodes:
-                if self.pipeline.data.get("pipeline_end", False):
-                    self.pipeline.terminate = True
-                    if "pipeline_end" not in node.inputs:
-                        continue
-                if "all" in node.inputs:
-                    inputs = copy.deepcopy(self.pipeline.data)
-                else:
-                    inputs = {
-                        key: self.pipeline.data[key]
-                        for key in node.inputs
-                        if key in self.pipeline.data
-                    }
-                if hasattr(node, "optional_inputs"):
-                    for key in node.optional_inputs:
-                        # The nodes will not receive inputs with the optional
-                        # key if it's not found upstream
-                        if key in self.pipeline.data:
-                            inputs[key] = self.pipeline.data[key]
-                if node.name.endswith("output.screen"):
-                    # intercept screen output to Kivy
-                    img = self.pipeline.data["img"]
-                    # (0,0) == opencv top-left == kivy bottom-left
-                    frame = cv2.flip(img, 0)  # flip around x-axis
-                    self.frames.append(frame)  # save frame for playback
-                    self.frame_idx += 1
-                    self.show_frame()
-                else:
-                    outputs = node.run(inputs)
-                    self.pipeline.data.update(outputs)
-                # check for FPS on first iteration
-                if self.frame_idx == 0 and node.name.endswith("input.visual"):
-                    num_frames = node.total_frame_count
-                    if num_frames > 0:
-                        self.num_frames = num_frames
-                        self.enable_progress()
+        exec_msg: str = ""
+        _err = StringIO()
+        with redirect_stderr(_err):
+            try:
+                self._pipeline_running = True
+                for node in self.pipeline.nodes:
+                    if self.pipeline.data.get("pipeline_end", False):
+                        self.pipeline.terminate = True
+                        if "pipeline_end" not in node.inputs:
+                            continue
+                    if "all" in node.inputs:
+                        inputs = copy.deepcopy(self.pipeline.data)
                     else:
-                        self.num_frames = 0
-                        self.progress = None
+                        inputs = {
+                            key: self.pipeline.data[key]
+                            for key in node.inputs
+                            if key in self.pipeline.data
+                        }
+                    if hasattr(node, "optional_inputs"):
+                        for key in node.optional_inputs:
+                            # The nodes will not receive inputs with the optional
+                            # key if it's not found upstream
+                            if key in self.pipeline.data:
+                                inputs[key] = self.pipeline.data[key]
+                    if node.name.endswith("output.screen"):
+                        # intercept screen output to Kivy
+                        img = self.pipeline.data["img"]
+                        # (0,0) == opencv top-left == kivy bottom-left
+                        frame = cv2.flip(img, 0)  # flip around x-axis
+                        self.frames.append(frame)  # save frame for playback
+                        self.frame_idx += 1
+                        self.show_frame()
+                    else:
+                        outputs = node.run(inputs)
+                        self.pipeline.data.update(outputs)
+                    # check for FPS on first iteration
+                    if self.frame_idx == 0 and node.name.endswith("input.visual"):
+                        num_frames = node.total_frame_count
+                        if num_frames > 0:
+                            self.num_frames = num_frames
+                            self.enable_progress()
+                        else:
+                            self.num_frames = 0
+                            self.progress = None
 
-            if self.progress:
-                self.progress.value += 1
+                if self.progress:
+                    self.progress.value += 1
 
-            if not self.pipeline.terminate:
-                Clock.schedule_once(self.run_one_pipeline_iteration, PLAYBACK_INTERVAL)
-            else:
-                Clock.schedule_once(self.run_pipeline_done, PLAYBACK_INTERVAL)
-        except BaseException as e:
-            logger.exception("PeekingDuck Error!")
-            # logger.debug(e)
-            self.run_pipeline_done()
-            self.disable_slider()
-            self._pipeline_model.set_dirty_bit()  # but all is not well
+                if not self.pipeline.terminate:
+                    Clock.schedule_once(
+                        self.run_one_pipeline_iteration, PLAYBACK_INTERVAL
+                    )
+                else:
+                    Clock.schedule_once(self.run_pipeline_done, PLAYBACK_INTERVAL)
+            except BaseException as e:
+                logger.exception("PeekingDuck Error!")
+                # exc_msg = str(e)
+                exc_msg = traceback.format_exc()
+                self.run_pipeline_done()
+                self.disable_slider()
+                self._pipeline_model.set_dirty_bit()  # but all is not well
+
+        err_msg = parse_streams(_err)
+        if err_msg:
+            logger.debug(f"err_msg: {len(err_msg)}")
+            logger.debug(err_msg)
+        if exc_msg:
+            logger.debug(f"exc_msg: {len(exc_msg)}")
+            logger.debug(exc_msg)
+            the_msg = err_msg if err_msg else exc_msg
+            msgbox = MsgBox("PeekingDuck Runtime Error", the_msg, "Ok")
+            msgbox.show()
 
     def stop_running_pipeline(self) -> None:
         """Signals pipeline execution to be stopped"""
