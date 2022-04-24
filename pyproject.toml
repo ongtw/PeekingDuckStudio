@@ -1,3 +1,18 @@
+[project]
+name = "peekingduck_studio"
+version = "1.0.0"
+description = "The PeekingDuck Studio Application"
+authors = [
+    "David Ong Tat-Wee"
+]
+license = "Apache"
+python = ">=3.7"
+
+[dependencies]
+kivy = "2.1.0"
+peekingduck = "1.2.0"
+pyobjc = "8.4.1"
+
 [build-system]
 requires = ["setuptools>=42"]
 build-backend = "setuptools.build_meta"
