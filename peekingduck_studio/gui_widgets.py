@@ -22,13 +22,25 @@ from kivy.uix.screenmanager import Screen
 from kivy.uix.slider import Slider
 from kivy.uix.spinner import SpinnerOption
 from typing import List
-from peekingduck_studio.colors import DEEP_SKY_BLUE, LIGHT_SKY_BLUE
+from functools import partial
+from peekingduck_studio.colors import (
+    BLACK,
+    BLUE,
+    DARK_BLUE,
+    DARK_SLATE_GRAY,
+    DEEP_SKY_BLUE,
+    LIGHT_SKY_BLUE,
+    MIDNIGHT_BLUE,
+    SILVER,
+    WHITE,
+)
 from peekingduck_studio.gui_utils import get_node_color, make_logger
 
 NODE_HEIGHT: int = 80
 NODE_PADDING: int = 5
 NODE_TEXT_SCALE: float = 0.25
 SINGLE_TAP_DELAY: float = 0.25
+TOOLTIP_DELAY: float = 2.0
 
 logger = make_logger(__name__)
 
@@ -67,7 +79,9 @@ class FileSaveDialog(FloatLayout):
 
 class MsgBox:
     """Custom dialog box class for messages
-    MsgBoxPopup defined in peekingduckstudio.kv file"""
+    MsgBoxPopup defined in peekingduckstudio.kv file
+    Todo: mimic MFC MsgBox behavior
+    """
 
     def __init__(
         self,
@@ -102,7 +116,6 @@ class Node(GridLayout):
     # don't use 'uid' as Kivy seems to use it internally, so will conflict!
     node_id = StringProperty("")
     callback_double_tap = ObjectProperty(None)
-    # callback_press = ObjectProperty(None)
     scheduled_press = None
 
     def __init__(self, uid: str, node_title: str, node_idx: int, **kwargs):
@@ -120,31 +133,36 @@ class Node(GridLayout):
         self.node_height = height * Metrics.dp
 
     def on_touch_down(self, touch):
+        # logger.debug(f"button={touch.button}")
         if self.collide_point(*touch.pos):
             if touch.is_double_tap:
-                logger.debug(f"double-tap {self.node_text}")
-                logger.debug(f"  touch: {touch}")
+                logger.debug(f"double-tap text={self.node_text}, button={touch.button}")
                 if self.scheduled_press:
-                    logger.debug("cancelling self.scheduled_press")
+                    logger.debug("cancel scheduled_press")
                     self.scheduled_press.cancel()
                     self.scheduled_press = None
                 if self.callback_double_tap:
                     self.callback_double_tap(self)
             else:
-                logger.debug(f"tap {self.node_text}")
+                logger.debug(f"text={self.node_text}, button={touch.button}")
                 # dotw: Need to schedule do_press in order to properly differentiate
                 # between single and double tap. If double tap occurs, then cancel
                 # the single tap do_press callback.
                 if self.callback_press:
                     self.scheduled_press = Clock.schedule_once(
-                        self.do_press, SINGLE_TAP_DELAY
+                        partial(self.do_press, touch), SINGLE_TAP_DELAY
                     )
             return True  # stop event from percolating
         return super().on_touch_down(touch)
 
-    def do_press(self, *args):
-        logger.debug("  node pressed")
-        self.callback_press(self)
+    # def on_touch_up(self, touch):
+    #     logger.debug(f"button={touch.button}")
+    #     return super().on_touch_up(touch)
+
+    def do_press(self, touch, delay):
+        logger.debug(f"touch={touch}, button={touch.button}, delay={delay}")
+        if touch.button == "left":
+            self.callback_press(self)
 
 
 class NodeConfig(GridLayout):
@@ -158,6 +176,7 @@ class NodeConfig(GridLayout):
     node_height = NumericProperty(NODE_HEIGHT * Metrics.dp)
     has_tooltip = BooleanProperty(False)
     callback_double_tap = ObjectProperty(None)
+    scheduled_press = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -166,20 +185,29 @@ class NodeConfig(GridLayout):
             self.update(height)
             # logger.debug(f"height={height}, config_height={self.node_height}")
         # experimental: not sure if having tooltip is better
-        # if self.has_tooltip:
-        #     self.enable_tooltip()
+        if self.has_tooltip:
+            self.enable_tooltip()
 
     def update(self, height: int):
         self.node_height = height * Metrics.dp
 
     def on_touch_down(self, touch):
+        logger.debug(f"button={touch.button}")
         if touch.is_double_tap:
             if self.collide_point(*touch.pos):
-                logger.debug(f"double-tap {self.config_key}")
+                logger.debug(f"double-tap key:{self.config_key}")
+                if self.scheduled_press:
+                    logger.debug("cancel scheduled_press")
+                    self.scheduled_press.cancel()
+                    self.scheduled_press = None
                 if self.callback_double_tap:
                     self.callback_double_tap(self)
                 return True  # stop event from percolating
         return super().on_touch_down(touch)
+
+    # def on_touch_up(self, touch):
+    #     logger.debug(f"button={touch.button}")
+    #     return super().on_touch_up(touch)
 
     def debug(self):
         logger.debug(f"key={self.config_key} height={self.height}")
@@ -197,19 +225,19 @@ class NodeConfig(GridLayout):
         if not self.get_root_window():
             # logger.debug("get_root_window is False")
             return
-        # pos = args[1]
         Clock.unschedule(self.show_tooltip)  # cancel on moving cursor
         self.close_tooltip()  # close if it's opened
         if self.collide_point(*self.to_widget(*pos)):
             # logger.debug(f"  mouse over: {self.text}")
             self.tooltip.pos = pos
             self.tooltip.text = f"{self.config_key}: {self.config_value}"
-            Clock.schedule_once(self.show_tooltip, 2.0)
+            Clock.schedule_once(self.show_tooltip, TOOLTIP_DELAY)
 
     def close_tooltip(self, *args):
         Window.remove_widget(self.tooltip)
 
     def show_tooltip(self, *args):
+        logger.debug(f"show_tooltip: args={args}")
         Window.add_widget(self.tooltip)
 
 
@@ -263,14 +291,48 @@ class ProjectInfo(GridLayout):
         return super().on_touch_down(touch)
 
 
-class RoundedButton(Button):
+class Button3D(Button):
     # cannot assign colors in kv file, need to create properties here
-    color_normal = ListProperty(list(DEEP_SKY_BLUE))
-    color_pressed = ListProperty(list(LIGHT_SKY_BLUE))
     btn_height = NumericProperty(40 * Metrics.dp)
+    color_normal = ListProperty(list(DEEP_SKY_BLUE))
+    color_pressed = ListProperty(list(DEEP_SKY_BLUE))
+    color_shadow = ListProperty(list(MIDNIGHT_BLUE))
+    has_tooltip = BooleanProperty(False)
+    tooltip_text = StringProperty("")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        if self.has_tooltip:
+            self.enable_tooltip()
+
+    def enable_tooltip(self):
+        Window.bind(mouse_pos=self.on_mouse_pos)
+        self.tooltip = Tooltip()
+
+    def on_mouse_pos(self, win, pos):
+        if not self.get_root_window():
+            # logger.debug("get_root_window is False")
+            return
+        Clock.unschedule(self.show_tooltip)  # cancel on moving cursor
+        self.close_tooltip()  # close if it's opened
+        if self.collide_point(*self.to_widget(*pos)):
+            # logger.debug(f"  mouse over: {self.text}")
+            self.tooltip.pos = pos
+            self.tooltip.text = f"{self.tooltip_text}"
+            Clock.schedule_once(self.show_tooltip, TOOLTIP_DELAY)
+
+    def close_tooltip(self, *args):
+        Window.remove_widget(self.tooltip)
+
+    def show_tooltip(self, *args):
+        Window.add_widget(self.tooltip)
+
+
+class RoundedButton(Button):
+    # cannot assign colors in kv file, need to create properties here
+    btn_height = NumericProperty(40 * Metrics.dp)
+    color_normal = ListProperty(list(DEEP_SKY_BLUE))
+    color_pressed = ListProperty(list(LIGHT_SKY_BLUE))
 
 
 class ScreenPipeline(Screen):
