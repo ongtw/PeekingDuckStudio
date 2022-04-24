@@ -29,7 +29,7 @@ logger = make_logger(__name__)
 
 
 class ConfigController:
-    def __init__(self, config_parser, pipeline_view) -> None:
+    def __init__(self, config_parser, pipeline_view, capture_keyboard_callback) -> None:
         self.pipeline_view = pipeline_view
         self.config_header = pipeline_view.ids["pipeline_config_header"]
         self.pipeline_config = pipeline_view.ids["pipeline_config"]
@@ -38,6 +38,7 @@ class ConfigController:
         self.pipeline_model: ModelPipeline = None
         self.overlay: BoxLayout = None
         self._node_height: int = NODE_HEIGHT
+        self.app_capture_keyboard_cb = capture_keyboard_callback
 
     @property
     def node_height(self) -> int:
@@ -186,6 +187,10 @@ class ConfigController:
             self.set_node_config(key, val)
             self.overlay.clear_widgets()
             self.overlay = None
+
+            # restore main app's ability to intercept keyboard
+            self.app_capture_keyboard_cb()
+
             # refresh config display
             self.show_node_configs(self.node_uid, focus_on_config=key)
 
@@ -362,7 +367,7 @@ class ConfigController:
                         config_set=tick,
                         config_readonly=k in NODE_CONFIG_READONLY_KEYS,
                         callback_double_tap=self.config_double_tap,
-                        has_tooltip=True,
+                        # has_tooltip=True,
                         height=self.node_height,
                     )
                     config_layout.add_widget(config)

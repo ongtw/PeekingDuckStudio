@@ -5,7 +5,6 @@
 from typing import List, Union
 from peekingduck_studio.gui_utils import NODE_COLOR_SELECTED, make_logger
 from peekingduck_studio.gui_widgets import Node, NODE_HEIGHT
-from peekingduck_studio.config_parser import NodeConfigParser
 from peekingduck_studio.model_node import ModelNode
 from peekingduck_studio.model_pipeline import ModelPipeline
 
@@ -13,12 +12,11 @@ logger = make_logger(__name__)
 
 
 class PipelineController:
-    def __init__(self, config_parser, pipeline_view) -> None:
+    def __init__(self, pipeline_view) -> None:
         self.pipeline_view = pipeline_view
         self.pipeline_header = self.pipeline_view.ids["pipeline_header"]
         self.nodes_view = self.pipeline_view.ids["pipeline_nodes"]
         self.nodes_layout = self.nodes_view.ids["pipeline_layout"]
-        self.config_parser: NodeConfigParser = config_parser
         self.pipeline_model: ModelPipeline = None
         self._node_height: int = NODE_HEIGHT
 

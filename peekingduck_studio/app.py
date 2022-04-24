@@ -11,6 +11,8 @@
 # - weights download sends output to stderr, code thinks it's an error
 #
 # Features:
+# - playlist of pipelines
+# - videos to autoloop
 # - add performance evaluation support
 #
 # Quirk list:
@@ -47,6 +49,11 @@
 ##########
 # Imports
 ##########
+from datetime import datetime
+
+print(
+    f"Start: {datetime.now().strftime('%H:%M:%S')}"
+)  # temp to debug pyinstaller launch times
 from kivy.config import Config
 from kivy.metrics import Metrics
 
@@ -59,6 +66,8 @@ Config.set("graphics", "height", WIN_HEIGHT)
 Config.set("graphics", "minimum_width", WIN_WIDTH)
 Config.set("graphics", "minimum_height", WIN_HEIGHT)
 Config.set("graphics", "resizable", True)
+Config.set("input", "mouse", "mouse,multitouch_on_demand")  # disable multitouch emul
+print(f"Kivy config done: {datetime.now().strftime('%H:%M:%S')}")
 
 from kivy.app import App
 from kivy.clock import Clock
@@ -68,11 +77,15 @@ from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
 from kivy.uix.widget import Widget
 
+print(f"Kivy import done: {datetime.now().strftime('%H:%M:%S')}")
+
 from typing import List
 import json
 import os
 from pathlib import Path
 import yaml
+
+print(f"PeekingDuck import start: {datetime.now().strftime('%H:%M:%S')}")
 from peekingduck_studio.gui_utils import (
     NODE_COLOR_SELECTED,
     NODE_COLOR_CLEAR,
@@ -95,6 +108,8 @@ from peekingduck_studio.output_controller import OutputController
 from peekingduck_studio.pipeline_controller import PipelineController
 from peekingduck_studio.model_pipeline import ModelPipeline
 
+print(f"PeekingDuck import end: {datetime.now().strftime('%H:%M:%S')}")
+
 ##########
 # Globals
 ##########
@@ -104,7 +119,7 @@ ROOT_PATH = "/"
 CURR_PATH = str(Path.home())
 DIR_FILTERS = [""]
 FILE_FILTERS = ["*yml"]
-BUTTON_DELAY: float = 0.2
+BUTTON_DELAY: float = 0.25
 PLAYBACK_DELAY: float = 0.01
 
 logger = make_logger(__name__)
@@ -117,7 +132,6 @@ class PeekingDuckStudioApp(App):
         Main Kivy application entry point
         """
         self.title = "PeekingDuck Studio v1.0b (Internal Preview)"
-        # self.icon = "pkds_mac.png"
 
         sm = ScreenManager()
         self.screen_pipeline = ScreenPipeline(name="screen_pipeline")
@@ -137,27 +151,29 @@ class PeekingDuckStudioApp(App):
 
         self.config_parser = NodeConfigParser()
         self.config_controller = ConfigController(
-            self.config_parser, self.pipeline_view
+            self.config_parser, self.pipeline_view, self.capture_keyboard
         )
-        self.output_controller = OutputController(self.config_parser, self.pkd_view)
-        self.pipeline_controller = PipelineController(
-            self.config_parser, self.pipeline_view
-        )
+        self.output_controller = OutputController(self.pkd_view)
+        self.pipeline_controller = PipelineController(self.pipeline_view)
         self.pipeline_model = None
 
-        # disable 'coz interferes with TextInput overlay
-        # self._keyboard = Window.request_keyboard(
-        #     self.keyboard_closed, self.screen_pipeline
-        # )
-        # self._keyboard.bind(on_key_down=self.on_keyboard_down)
-
         Window.bind(on_resize=self.on_window_resize)
+        print(f"App.build() done: {datetime.now().strftime('%H:%M:%S')}")
+
+        self.capture_keyboard()
 
         return sm
 
     # Window events (experimental)
     def on_window_resize(self, win, width, height):
-        # recalculate height for GUI node/node config
+        """Callback on Window resize event,
+        recalculate height for GUI node/node config and app font_size to support scalability
+
+        Args:
+            win (Widget): the Window (only one)
+            width (_type_): window width
+            height (_type_): window height
+        """
         increase = height / WIN_HEIGHT - 1.0
         new_node_height = int(80 * (1.0 + increase * 0.3))
         # logger.debug(f"x={width}, y={height}, new_node_height={new_node_height}")
@@ -167,22 +183,58 @@ class PeekingDuckStudioApp(App):
         self.font_size = max(16, int(15 * Window.height / WIN_HEIGHT)) * Metrics.sp
 
     # Keyboard events (experimental codes)
+    def capture_keyboard(self) -> None:
+        """Capture keyboard input
+        NB: will be disabled by TextInput overlay, to fix this!
+        """
+        logger.debug("capture keyboard")
+        self._keyboard = Window.request_keyboard(
+            self.keyboard_closed, self.screen_pipeline
+        )
+        self._keyboard.bind(on_key_down=self.on_keyboard_down)
+
     def to_window(self, x, y, initial=True, relative=False):
+        """Map x, y to Window coords (?)
+        Need this for keyboard events to work properly (a quick hack?)
+
+        Args:
+            x (_type_): x coordinate
+            y (_type_): y coordinate
+            initial (bool, optional): ?. Defaults to True.
+            relative (bool, optional): absolute vs relative coord (?).
+                                       Defaults to False.
+
+        Returns:
+            _type_: Window x, y coordinates (?)
+        """
         # Need this for keyboard events to work properly (quick hack?)
         return x, y
 
     def keyboard_closed(self) -> None:
+        """Called if keyboard is closed for any reason"""
+        logger.debug("keyboard_closed")
         self._keyboard.unbind(on_key_down=self.on_keyboard_down)
         self._keyboard = None
 
     def on_keyboard_down(self, keyboard, keycode, text, modifiers) -> bool:
-        logger.debug(f"keycode: {keycode} pressed, text={text}, modifiers={modifiers}")
+        """Bind to Keyboard.on_key_down event
+
+        Args:
+            keyboard (_type_): the keyboard
+            keycode (_type_): code of key pressed
+            text (_type_): displayable text of key pressed, if any
+            modifiers (_type_): keyboard modifiers, if any
+
+        Returns:
+            bool: True if accept, False will percolate key down event
+        """
+        logger.debug(f"keycode={keycode}, text={text}, modifiers={modifiers}")
         # if keycode[1] == "escape":
         #     keyboard.release()  # stop accepting key inputs
-        # if keycode[1] == "escape":
-        #     self.clear_selected_configs()
-        #     self.clear_selected_nodes()
-        #     return True  # to accept key, else will be used by system
+        if keycode[1] == "escape":
+            self.clear_selected_configs()
+            self.clear_selected_nodes()
+            return True  # to accept key, else will be used by system
         return False
 
     # App GUI Widget Access
@@ -242,8 +294,8 @@ class PeekingDuckStudioApp(App):
         self.sm.current = "screen_pipeline"
 
     def btn_goto_screen_playback(self, *args) -> None:
+        """Transition left to playback screen"""
         if self.pipeline_model:
-            """Transition left to playback screen"""
             self.sm.transition.direction = "left"
             self.sm.current = "screen_playback"
             self.screen_playback.bind(on_enter=self.auto_play_once)
@@ -373,15 +425,14 @@ class PeekingDuckStudioApp(App):
     #
     # Main app buttons
     #
-    def btn_about(self, btn) -> None:
+    def btn_about(self, btn: Button) -> None:
         """Show About this Program dialog box
 
         Args:
             btn (Button): the About button
         """
         title = "About PeekingDuck Studio"
-        msg = """
-PeekingDuck Studio v1.0b (Internal Preview)
+        msg = """PeekingDuck Studio v1.0b (Internal Preview)
 by David Ong Tat-Wee
 (C) 2022
 
@@ -389,12 +440,11 @@ PeekingDuck Atelier:
 - pipeline editor
 - playback viewer
 
-A multiple-nights/weekends project using Python and Kivy
-        """
+A multiple-nights/weekends project using Python and Kivy"""
         msgbox = MsgBox(title, msg, "Ok", font_size=self.font_size)
         msgbox.show()
 
-    def btn_quit(self, btn) -> None:
+    def btn_quit(self, btn: Button) -> None:
         """Stop and quit PeekingDuck Studio application
 
         Args:
@@ -403,11 +453,11 @@ A multiple-nights/weekends project using Python and Kivy
         # todo: ask user to confirm quit / save changes
         self.stop()
 
-    def btn_load_file(self, btn) -> None:
+    def btn_load_file(self, btn: Button) -> None:
         """Show FileChooser for user to load a pipeline file
 
         Args:
-            btn (Buton): the Load button
+            btn (Button): the Load button
         """
         file_dialog = FileLoadDialog(
             select=self.load_file, cancel=self.cancel_file_dialog
@@ -419,7 +469,7 @@ A multiple-nights/weekends project using Python and Kivy
         )
         self._file_dialog.open()
 
-    def btn_new_file(self, btn) -> None:
+    def btn_new_file(self, btn: Button) -> None:
         """Start a new pipeline
 
         Args:
@@ -431,7 +481,12 @@ A multiple-nights/weekends project using Python and Kivy
         self.project_info.filename = self.filename
         self._do_begin_pipeline()
 
-    def btn_save_file(self, btn) -> None:
+    def btn_save_file(self, btn: Button) -> None:
+        """Save current pipeline to file
+
+        Args:
+            btn (Button): the Save button
+        """
         if self.pipeline_model:
             file_dialog = FileSaveDialog(
                 save=self.save_file, cancel=self.cancel_file_dialog
@@ -455,20 +510,20 @@ A multiple-nights/weekends project using Python and Kivy
             )
             msgbox.show()
 
-    def btn_sound_on_off(self, btn) -> None:
-        """Toggle sound on/off
+    # def btn_sound_on_off(self, btn: Button) -> None:
+    #     """Toggle sound on/off (unused)
+    #
+    #     Args:
+    #         btn (Button): the Sound On/Off button
+    #     """
+    #     parent = btn.parent
+    #     logger.debug(f"tag={parent.tag}")
 
-        Args:
-            btn (Button): the Sound On/Off button
-        """
-        parent = btn.parent
-        logger.debug(f"tag={parent.tag}")
-
-    def btn_yaml(self, btn) -> None:
+    def btn_yaml(self, btn: Button) -> None:
         """Show pipeline's yaml source code
 
         Args:
-            btn (_type_): the Yaml button
+            btn (Button): the Yaml button
         """
 
         def split_long_line(yaml_line: str, max_len: int = 80, indent: int = 4) -> str:
@@ -562,14 +617,16 @@ A multiple-nights/weekends project using Python and Kivy
 
     #
     # Playback controls
+    # Callback functions when respective buttons are clicked.
+    # No docstrings 'coz all are self-explanatory.
     #
-    def btn_replay_press(self, btn) -> None:
+    def btn_replay_press(self, btn: Button) -> None:
         if self.pipeline_model is None:
             return
         logger.debug(f"tag={btn.tag}")
         self.output_controller.replay()
 
-    def btn_play_stop_press(self, btn) -> None:
+    def btn_play_stop_press(self, btn: Button) -> None:
         if self.pipeline_model is None:
             return
         logger.debug(f"tag={btn.tag}")
@@ -669,6 +726,13 @@ A multiple-nights/weekends project using Python and Kivy
         self.pipeline_controller.draw_nodes()
 
     def save_file(self, path: str, file_path: str) -> None:
+        """Called by Save pipeline callback.
+        Get pipeline string representation and write it to a YAML file.
+
+        Args:
+            path (str): path to folder to save YAML file
+            file_path (str): the YAML file name/path
+        """
         self._file_dialog.dismiss()
         full_path = file_path if file_path.startswith(path) else f"{path}/{file_path}"
         logger.debug(f"path: {path}, file_path: {file_path}")
@@ -686,7 +750,12 @@ A multiple-nights/weekends project using Python and Kivy
     #####################
     # Pipeline processing
     #####################
-    def btn_node_add(self, instance) -> None:
+    def btn_node_add(self, btn: Button) -> None:
+        """Add a new node to pipeline
+
+        Args:
+            btn (Button): the Add Node button
+        """
         if self.pipeline_model is None:
             return
         logger.debug("add node")
@@ -700,15 +769,18 @@ A multiple-nights/weekends project using Python and Kivy
         # trigger callback to select new node
         self.btn_node_press(gui_node)
         self.anim_function = shake_widget
-        Clock.schedule_once(self.clock_do_anim_node, 0.2)
+        Clock.schedule_once(self.clock_do_add_node_anim, 0.2)
 
-    def clock_do_anim_node(self, *args) -> None:
+    def clock_do_add_node_anim(self, *args) -> None:
+        """Provide visual feedback after adding new node"""
         self.anim_function(self.selected_node)
 
-    def clock_do_select_node(self, *args) -> None:
-        self.btn_node_press(self.selected_node)
+    def btn_node_delete(self, btn: Button) -> None:
+        """Delete existing pipeline node
 
-    def btn_node_delete(self, instance) -> None:
+        Args:
+            btn (Button): the Delete Node button
+        """
         if self.pipeline_model is None:
             return
         logger.debug("delete node")
@@ -719,11 +791,13 @@ A multiple-nights/weekends project using Python and Kivy
             logger.debug("nothing selected to delete")
 
     def clock_do_delete_node(self, *args) -> None:
+        """Call actual delete node operation, scheduled to run after visual feedback"""
         idx = int(self.selected_node.node_number) - 1
         self.pipeline_controller.delete_node(idx)
         self.clear_selected_nodes()
 
     def btn_node_move_up_press(self, *args) -> None:
+        """Called when Node Move Up button is pressed"""
         if self.all_selected_nodes:
             for node in self.all_selected_nodes:
                 break  # only handle one node for now
@@ -736,6 +810,7 @@ A multiple-nights/weekends project using Python and Kivy
             )
 
     def btn_node_move_up_release(self, *args) -> None:
+        """Called when Node Move Up button is released"""
         if self.btn_node_move_up_held:
             self.btn_node_move_up_held.cancel()
         if self.selected_node:
@@ -745,6 +820,7 @@ A multiple-nights/weekends project using Python and Kivy
             logger.debug(f"selected={node_num} {node_title}")
 
     def btn_node_move_down_press(self, *args) -> None:
+        """Called when Node Move Down button is pressed"""
         if self.all_selected_nodes:
             for node in self.all_selected_nodes:
                 break  # only handle one node for now
@@ -757,6 +833,7 @@ A multiple-nights/weekends project using Python and Kivy
             )
 
     def btn_node_move_down_release(self, *args) -> None:
+        """Called when Node Move Down button is released"""
         if self.btn_node_move_down_held:
             self.btn_node_move_down_held.cancel()
         if self.selected_node:
@@ -766,6 +843,7 @@ A multiple-nights/weekends project using Python and Kivy
             logger.debug(f"selected={node_num} {node_title}")
 
     def btn_verify_pipeline(self, *args) -> None:
+        """Todo: verify pipeline and flag errors"""
         res = self.pipeline_controller.verify_pipeline()
         logger.debug(res)
 
