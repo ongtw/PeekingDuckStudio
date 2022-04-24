@@ -11,6 +11,7 @@
 #:import GRAY peekingduck_studio.colors.GRAY
 #:import GREEN peekingduck_studio.colors.GREEN
 #:import NAVY peekingduck_studio.colors.NAVY
+#:import ORANGE peekingduck_studio.colors.ORANGE
 #:import RED peekingduck_studio.colors.RED
 #:import ROYAL_BLUE peekingduck_studio.colors.ROYAL_BLUE
 #:import SILVER peekingduck_studio.colors.SILVER
@@ -116,7 +117,8 @@
         size: self.minimum_size
         padding: [10, 5]
         cols: 1
-        Label:  # spacer
+        Label:
+        # spacer
             size_hint_y: None
             height: dp(10)
         AnchorLayout:
@@ -132,12 +134,14 @@
                 size_hint: None, None
                 size: self.texture_size
                 padding: [10, 5]
-        Label:  # spacer
+        Label:
+        # spacer
             size_hint_y: None
             height: dp(10)
         Separator:
             direction: "horizontal"
-        Label:  # spacer
+        Label:
+        # spacer
             size_hint_y: None
             height: dp(10)
         AnchorLayout:
@@ -153,7 +157,8 @@
                 size_hint: None, 0.7
                 width: self.texture_size[0] if self.texture_size[0] > 120 else 120
                 on_release: root.dismiss()
-        Label:  # spacer
+        Label:
+        # spacer
             size_hint_y: None
             height: dp(10)
 
@@ -368,7 +373,8 @@
         Rectangle:
             size: self.size
             pos: self.pos
-    Label:  # spacer
+    Label:
+    # spacer
         text: ""
         size_hint_x: None
         width: dp(5)
@@ -387,7 +393,8 @@
             root.callback_node_type(self) if root.state == "enabled" else ""
         # dropdown_cls: Factory.CustomDropDown
         option_cls: Factory.CustomSpinnerOptions
-    Label:  # spacer
+    Label:
+    # spacer
         text: ""
         size_hint_x: None
         width: dp(5)
@@ -406,7 +413,8 @@
             root.callback_node_name(self) if root.state == "enabled" else ""
         # dropdown_cls: Factory.CustomDropDown
         option_cls: Factory.CustomSpinnerOptions
-    Label:  # spacer till end
+    Label:
+    # spacer till end
         text: ""
 
 
@@ -514,7 +522,8 @@
         Rectangle:
             pos: self.pos
             size: self.size
-    BoxLayout:  # default/user config indicator
+    BoxLayout:
+    # default/user config indicator
         orientation: "vertical"
         size_hint_x: None
         width: dp((root.height - 2 * CONFIG_PADDING) / 2) - 2 * CONFIG_PADDING
@@ -550,7 +559,8 @@
     Separator:
         line_color: BLACK
         width: dp(5)
-    BoxLayout:  # config key text
+    BoxLayout:
+    # config key text
         size_hint_x: None
         width: dp(root.width * PIPELINE_CONFIG_LABEL_RATIO)
         Label:
@@ -563,7 +573,8 @@
     Separator:
         line_color: BLACK
         width: dp(5)
-    FloatLayout:    # config value text
+    FloatLayout:
+    # config value text
         RoundedButton:
             id: id_btn_config
             pos_hint: {"center_x": 0.5, "center_y": 0.5}
@@ -745,7 +756,8 @@
 <PipelineView@BoxLayout>:
     config_state: "expand"
 
-    BoxLayout:  # pipeline node panel (left)
+    BoxLayout:
+    # pipeline node panel (left)
         orientation: "vertical"
         size_hint_x: PIPELINE_NODE_WIDTH
         Header:
@@ -757,7 +769,12 @@
             line_color: BLACK
         PipelineNodesScroll:
             id: pipeline_nodes
-        NodeControls: # pipeline editor buttons
+        Separator:
+            direction: "horizontal"
+            height: dp(0.01 * root.parent.height)
+            line_color: TRANSPARENT
+        NodeControls:
+        # pipeline editor buttons
             id: node_controls
             size_hint_y: None
             height: dp(root.parent.height * BUTTON_HEIGHT_RATIO + 20) if root.parent.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(20)
@@ -770,7 +787,8 @@
         line_color: GUI_COLOR
         width: dp(5)
 
-    BoxLayout:  # pipeline config panel (right)
+    BoxLayout:
+    # pipeline config panel (right)
         orientation: "vertical"
         BoxLayout:
             size_hint: 1, None
@@ -893,8 +911,8 @@
             Rectangle:
                 pos: self.pos
                 size: self.size
-        Separator:  # top margin
-            direction: "horizontal"
+        Separator:
+            direction: "horizontal" # top margin
             line_color: GUI_COLOR
             height: dp(0.01 * root.height)
         BoxLayout:
@@ -908,23 +926,44 @@
                     pos: self.pos
                     size: self.size
                     radius: [RADIUS,]
-            ProjectInfo:
-                id: project_info
+            BoxLayout:
                 size_hint_y: None
                 height: dp(0.12 * root.height)
+                BoxLayout:
+                    orientation: "vertical"
+                    size_hint_x: PIPELINE_NODE_WIDTH / 2
+                    Image:
+                        source: "AISG_Logo_1536x290.png"
+                        allow_stretch: True
+                        keep_ratio: True
+                        size_hint: None, None
+                        width: self.parent.width
+                        height: self.parent.width / self.image_ratio
+                    Label:
+                        color: ORANGE
+                        text: "PeekingDuck Studio by the Computer Vision Hub"
+                        font_size: max(sp(15), sp(self.height * 0.2))
+                        text_size: 0.95 * self.parent.width, None
+                        size: self.texture_size
+                        halign: "center"
+                        valign: "middle"
+                ProjectInfo:
+                    id: project_info
+                    size_hint_y: None
+                    height: dp(0.12 * root.height)
             PipelineView:
                 id: pipeline_view
         Separator:
             direction: "horizontal"
             line_color: GUI_COLOR
             height: dp(0.01 * root.height)
-        PipelineControls:   # pipeline control buttons
-            id: pipeline_controls
+        PipelineControls:
+            id: pipeline_controls   # pipeline control buttons
             pos_hint: {"x":0.01}
             size_hint: 0.98, None
             height: dp(root.height * BUTTON_HEIGHT_RATIO + 10) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
-        Separator:  # bottom margin
-            direction: "horizontal"
+        Separator:
+            direction: "horizontal" # bottom margin
             line_color: GUI_COLOR
             height: dp(0.01 * root.height)
 
@@ -956,8 +995,8 @@
             font_size: sp(self.height * BUTTON_FONT_SMALLER)
             opacity: 1 if root.visible else 0
             size_hint_x: 0.25
-        Slider: # this widget gets replaced dynamically during runtime
-            id: slider
+        Slider:
+            id: slider  # this widget gets replaced dynamically during runtime
             opacity: 1 if root.visible else 0
             size_hint_x: 0.5
         Label:
@@ -1086,7 +1125,8 @@
         Rectangle:
             pos: self.pos
             size: self.size
-    Separator:  # top margin
+    Separator:
+    # top margin
         direction: "horizontal"
         line_color: GUI_COLOR
         height: dp(0.01 * root.height)
@@ -1115,7 +1155,8 @@
                 width: dp(20)
         Output:
             id: pkd_output
-        Separator:  # bottom margin
+        Separator:
+        # spacer below progress bar/slider
             direction: "horizontal"
             line_color: TRANSPARENT
             height: dp(10)
@@ -1123,12 +1164,14 @@
         direction: "horizontal"
         line_color: GUI_COLOR
         height: dp(0.01 * root.height)
-    PeekingDuckControls:    # output playback buttons
+    PeekingDuckControls:
+    # output playback buttons
         id: pkd_controls
         pos_hint: {"x": 0.01}
         size_hint: 1.00, None
         height: dp(root.height * BUTTON_HEIGHT_RATIO + 10) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
-    Separator:  # bottom margin
+    Separator:
+    # bottom margin
         direction: "horizontal"
         line_color: GUI_COLOR
         height: dp(0.01 * root.height)
