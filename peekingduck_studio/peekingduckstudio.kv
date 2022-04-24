@@ -74,7 +74,9 @@
     text_size: self.size
     halign: "center"
     valign: "bottom"
-    padding_y: (self.height - self.font_size) / 2 if self.state == "normal" else (self.height - self.font_size) / 2 - 4
+    padding_y:
+        (self.height - self.font_size) / 2 \
+        if self.state == "normal" else (self.height - self.font_size) / 2 - 4
     # need to redirect callbacks (cannot change on_press at runtime)
     on_press: self.callback_press(self)
     on_release: self.callback_release(self)
@@ -149,7 +151,9 @@
             anchor_y: "bottom"
             size_hint: None, None
             width: max(message.width, butt.width)
-            height: dp(Window.height * BUTTON_HEIGHT_RATIO + 10) if Window.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
+            height:
+                dp(Window.height * BUTTON_HEIGHT_RATIO + 10) \
+                if Window.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
             Button3D:
                 id: butt
                 text: "Close"
@@ -168,11 +172,15 @@
     path: ctx.path
     selected: self.path in ctx.controller().selection
     size_hint: None, None
-    on_touch_down: self.collide_point(*args[1].pos) and ctx.controller().entry_touched(self, args[1])
-    on_touch_up: self.collide_point(*args[1].pos) and ctx.controller().entry_released(self, args[1])
+    on_touch_down:
+        self.collide_point(*args[1].pos) and ctx.controller().entry_touched(self, args[1])
+    on_touch_up:
+        self.collide_point(*args[1].pos) and ctx.controller().entry_released(self, args[1])
     # leave original sizes as comments for reference
     # size: '100dp', '100dp'
-    height: dp(100 * (1.0 + 0.6 * (min(Window.height / Window.minimum_height, Window.width / Window.minimum_width) - 1.0)))
+    height:
+        dp(100 * (1.0 + 0.6 * (min(Window.height / Window.minimum_height, \
+        Window.width / Window.minimum_width) - 1.0)))
     width: self.height
     canvas:
         Color:
@@ -185,7 +193,7 @@
     Image:
         # size: '48dp', '48dp'
         size: dp(0.5 * root.width), dp(0.5 * root.height)
-        source: 'atlas://data/images/defaulttheme/filechooser_%s' % ('folder' if ctx.isdir else 'file')
+        source: "atlas://data/images/defaulttheme/filechooser_%s" % ("folder" if ctx.isdir else "file")
         allow_stretch: True
         pos: root.x + dp(0.24 * root.width), root.y + dp(0.40 * root.height)
     Label:
@@ -224,8 +232,10 @@
     height: dp(24 * (1.0 + 0.5 * (Window.height / Window.minimum_height - 1.0)))
     # Don't allow expansion of the ../ node
     is_leaf: not ctx.isdir or ctx.name.endswith('..' + ctx.sep) or self.locked
-    on_touch_down: self.collide_point(*args[1].pos) and ctx.controller().entry_touched(self, args[1])
-    on_touch_up: self.collide_point(*args[1].pos) and ctx.controller().entry_released(self, args[1])
+    on_touch_down:
+        self.collide_point(*args[1].pos) and ctx.controller().entry_touched(self, args[1])
+    on_touch_up:
+        self.collide_point(*args[1].pos) and ctx.controller().entry_released(self, args[1])
     BoxLayout:
         pos: root.pos
         size_hint_x: None
@@ -777,7 +787,9 @@
         # pipeline editor buttons
             id: node_controls
             size_hint_y: None
-            height: dp(root.parent.height * BUTTON_HEIGHT_RATIO + 20) if root.parent.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(20)
+            height:
+                dp(root.parent.height * BUTTON_HEIGHT_RATIO + 20) \
+                if root.parent.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(20)
         Separator:
             direction: "horizontal"
             height: dp(0.01 * root.parent.height)
@@ -961,7 +973,9 @@
             id: pipeline_controls   # pipeline control buttons
             pos_hint: {"x":0.01}
             size_hint: 0.98, None
-            height: dp(root.height * BUTTON_HEIGHT_RATIO + 10) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
+            height:
+                dp(root.height * BUTTON_HEIGHT_RATIO + 10) \
+                if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
         Separator:
             direction: "horizontal" # bottom margin
             line_color: GUI_COLOR
@@ -987,7 +1001,9 @@
         id: grid
         cols: 4
         rows: 1
-        height: dp(root.height * BUTTON_HEIGHT_RATIO) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
+        height:
+            dp(root.height * BUTTON_HEIGHT_RATIO) \
+            if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
         size_hint_y: None
         Label:
             id: playback_speed
@@ -1169,7 +1185,9 @@
         id: pkd_controls
         pos_hint: {"x": 0.01}
         size_hint: 1.00, None
-        height: dp(root.height * BUTTON_HEIGHT_RATIO + 10) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
+        height:
+            dp(root.height * BUTTON_HEIGHT_RATIO + 10) \
+            if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
     Separator:
     # bottom margin
         direction: "horizontal"
