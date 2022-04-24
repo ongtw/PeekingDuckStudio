@@ -6,6 +6,7 @@
 # Globals: colors
 #:import BLACK peekingduck_studio.colors.BLACK
 #:import BLUE peekingduck_studio.colors.BLUE
+#:import DARK_BLUE peekingduck_studio.colors.DARK_BLUE
 #:import DODGER_BLUE peekingduck_studio.colors.DODGER_BLUE
 #:import GRAY peekingduck_studio.colors.GRAY
 #:import GREEN peekingduck_studio.colors.GREEN
@@ -17,7 +18,7 @@
 #:import YELLOW peekingduck_studio.colors.YELLOW
 #:import GUI_COLOR peekingduck_studio.colors.GUI_COLOR
 #:import CONFIG_COLOR peekingduck_studio.colors.CONFIG_COLOR
-#:set TRANSPARENT 1, 1, 1, 0
+#:import TRANSPARENT peekingduck_studio.colors.TRANSPARENT
 
 # Globals: sizing
 #:set MIN_HEIGHT 1000
@@ -63,7 +64,41 @@
 #
 # Helper Widgets
 #
+<Button3D>:
+    tag: ""
+    background_color: TRANSPARENT
+    color: BLACK
+    font_name: "Arial"
+    font_size: sp(self.height * BUTTON_FONT_SCALE)   # scale font accordingly
+    text_size: self.size
+    halign: "center"
+    valign: "bottom"
+    padding_y: (self.height - self.font_size) / 2 if self.state == "normal" else (self.height - self.font_size) / 2 - 4
+    # need to redirect callbacks (cannot change on_press at runtime)
+    on_press: self.callback_press(self)
+    on_release: self.callback_release(self)
+    callback_press: app.btn_press
+    callback_release: app.btn_release
+    # has_tooltip: True # tooltip still buggy, to re-engineer
+    canvas.before:
+        # shadow
+        Color:
+            rgba: self.color_shadow
+        RoundedRectangle:
+            size: self.size
+            pos: (self.x, self.y - 6)
+            radius: [dp(12),]
+        # button
+        Color:
+            rgba: self.color_normal if self.state == "normal" else self.color_pressed
+        RoundedRectangle:
+            size: self.size
+            pos: self.pos if self.state == "normal" else (self.x, self.y - 4)
+            radius: [dp(12),]
+
+
 <MsgBoxPopup@Popup>:
+    # Todo: re-engineer to mimic MFC MsgBox
     close_button: butt
     message: message
     auto_dismiss: False
@@ -81,6 +116,9 @@
         size: self.minimum_size
         padding: [10, 5]
         cols: 1
+        Label:  # spacer
+            size_hint_y: None
+            height: dp(10)
         AnchorLayout:
             anchor_x: "center"
             anchor_y: "bottom"
@@ -101,22 +139,23 @@
             direction: "horizontal"
         Label:  # spacer
             size_hint_y: None
-            height: dp(20)
+            height: dp(10)
         AnchorLayout:
             anchor_x: "center"
             anchor_y: "bottom"
             size_hint: None, None
-            height: butt.height
             width: max(message.width, butt.width)
-            Button:
+            height: dp(Window.height * BUTTON_HEIGHT_RATIO + 10) if Window.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
+            Button3D:
                 id: butt
                 text: "Close"
                 font_size: root.font_size
-                size_hint: None, None
-                width: self.texture_size[0] if self.texture_size[0] > 100 else 100
-                height: self.texture_size[1]
-                padding: [10, 5]
+                size_hint: None, 0.7
+                width: self.texture_size[0] if self.texture_size[0] > 120 else 120
                 on_release: root.dismiss()
+        Label:  # spacer
+            size_hint_y: None
+            height: dp(10)
 
 
 [FileIconEntry@Widget]:
@@ -126,6 +165,7 @@
     size_hint: None, None
     on_touch_down: self.collide_point(*args[1].pos) and ctx.controller().entry_touched(self, args[1])
     on_touch_up: self.collide_point(*args[1].pos) and ctx.controller().entry_released(self, args[1])
+    # leave original sizes as comments for reference
     # size: '100dp', '100dp'
     height: dp(100 * (1.0 + 0.6 * (min(Window.height / Window.minimum_height, Window.width / Window.minimum_width) - 1.0)))
     width: self.height
@@ -219,6 +259,7 @@
         Separator:
             direction: "horizontal"
             line_color: SILVER
+        # Todo: allow user to toggle between both views
         FileChooserIconView:
         # FileChooserListView:
             id: id_file_chooser
@@ -288,7 +329,7 @@
 
 
 <CustomDropDown@DropDown>:
-    # max_height: dp(Window.height // 3) # todo: scale
+    # max_height: dp(Window.height // 3) # todo: scale (?)
     bar_width: dp(5)
     bar_color: GREEN
     bar_inactive_color: RED
@@ -311,7 +352,7 @@
 
 
 <ConfigHeader@BoxLayout>:
-    # cannot use color constants here, will cause NoneType errors
+    # cannot use color constants here, will cause NoneType errors (weird Kivy bug?)
     font_color: 1, 1, 1, 1
     header_color: 0, 0, 0, 1
     node_type: ""
@@ -370,6 +411,7 @@
 
 
 <RoundedButton>:
+    # currently used for Node and NodeConfig (no 3D effect)
     tag: ""
     background_color: TRANSPARENT
     color: BLACK
@@ -567,115 +609,134 @@
 
 <NodeControls@BoxLayout>:
     orientation: "vertical"
-    Separator:
-        direction: "horizontal"
-        line_color: TRANSPARENT
-        size_hint_y: 0.10
     BoxLayout:
-        size_hint_y: 0.80
+        canvas:
+            Color:
+                rgba: GUI_COLOR
+            RoundedRectangle:
+                size: self.size
+                pos: self.pos
+                radius: [dp(12),]
+        size_hint_x: 0.9
+        pos_hint: {"center_x": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(20)
-        RoundedButton:
+        Button3D:
             tag: "node_add"
             text: "+"
             callback_press: app.btn_node_add
+            size_hint_y: 0.6
+            pos_hint: {"center_y": 0.5}
+            tooltip_text: "Add a new pipeline node"
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "node_delete"
             text: EN_DASH
             callback_press: app.btn_node_delete
+            size_hint_y: 0.6
+            pos_hint: {"center_y": 0.5}
+            tooltip_text: "Delete selected pipeline node"
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "node_up"
             text: TRIANGLE_UP
             callback_press: app.btn_node_move_up_press
             callback_release: app.btn_node_move_up_release
+            size_hint_y: 0.6
+            pos_hint: {"center_y": 0.5}
+            tooltip_text: "Move selected pipeline node up"
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "node_down"
             text: TRIANGLE_DOWN
             callback_press: app.btn_node_move_down_press
             callback_release: app.btn_node_move_down_release
+            size_hint_y: 0.6
+            pos_hint: {"center_y": 0.5}
+            tooltip_text: "Move selected pipeline node down"
         Separator:
             line_color: TRANSPARENT
             width: dp(20)
-    Separator:
-        direction: "horizontal"
-        line_color: TRANSPARENT
-        size_hint_y: 0.10
 
 
 <PipelineControls@BoxLayout>:
     orientation: "vertical"
-    canvas.before:
-        Color:
-            rgba: BLACK
-        RoundedRectangle:
-            pos: self.pos
-            size: self.size
-            radius: [RADIUS,]
-    Separator:
-        direction: "horizontal"
-        line_color: TRANSPARENT
-        size_hint_y: 0.10
     BoxLayout:
-        size_hint_y: 0.80
+        canvas:
+            Color:
+                rgba: GUI_COLOR
+            RoundedRectangle:
+                size: self.size
+                pos: self.pos
+                radius: [dp(12),]
+        size_hint_x: 0.9
+        pos_hint: {"center_x": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(20)
-        RoundedButton:
+        Button3D:
             text: "New"
             callback_press: app.btn_new_file
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             text: "Load"
             callback_press: app.btn_load_file
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             text: "Save"
             callback_press: app.btn_save_file
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             text: "Run"
             callback_press: app.btn_goto_screen_playback
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             text: "Yaml"
             callback_press: app.btn_yaml
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(30)
-        RoundedButton:
+        Button3D:
             text: "About"
             callback_press: app.btn_about
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             text: "Quit"
             callback_press: app.btn_quit
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(20)
-    Separator:
-        direction: "horizontal"
-        line_color: TRANSPARENT
-        size_hint_y: 0.10
 
 
 #
@@ -699,7 +760,7 @@
         NodeControls: # pipeline editor buttons
             id: node_controls
             size_hint_y: None
-            height: dp(root.parent.height * BUTTON_HEIGHT_RATIO) if root.parent.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
+            height: dp(root.parent.height * BUTTON_HEIGHT_RATIO + 20) if root.parent.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(20)
         Separator:
             direction: "horizontal"
             height: dp(0.01 * root.parent.height)
@@ -713,11 +774,11 @@
         orientation: "vertical"
         BoxLayout:
             size_hint: 1, None
-            height: dp(HEADER_HEIGHT)   # NB: need to be updated when ConfigHeader.height changes
+            height: dp(HEADER_HEIGHT)   # NB: to be updated when ConfigHeader.height changes
             BoxLayout:
                 # "toggle button" to show/hide node config items
                 size_hint_x: None
-                # parent.height is half node height, below formula from NodeConfig, to align column 1
+                # parent.height=(node height)/2, below formula from NodeConfig to align column 1
                 width: dp((2 * self.parent.height - 2 * CONFIG_PADDING) / 2)
                 canvas.before:
                     Color:
@@ -861,7 +922,7 @@
             id: pipeline_controls
             pos_hint: {"x":0.01}
             size_hint: 0.98, None
-            height: dp(root.height * BUTTON_HEIGHT_RATIO) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
+            height: dp(root.height * BUTTON_HEIGHT_RATIO + 10) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
         Separator:  # bottom margin
             direction: "horizontal"
             line_color: GUI_COLOR
@@ -879,7 +940,7 @@
     BoxLayout:
         Image:
             id: image
-            # experimental (doesn't work well, see python code technotes)
+            # experiment with image scaling (doesn't work well, see python code technotes)
             # pos_hint: {"center_x":0.5, "center_y":0.5}
             # size_hint: (None, None)
             # allow_stretch: True
@@ -915,98 +976,106 @@
 
 <PeekingDuckControls@BoxLayout>:
     orientation: "vertical"
-    canvas.before:
-        Color:
-            rgba: BLACK
-        RoundedRectangle:
-            pos: self.pos
-            size: self.size
-            radius: [RADIUS,]
-    Separator:
-        direction: "horizontal"
-        line_color: TRANSPARENT
-        size_hint_y: 0.10
     BoxLayout:
-        size_hint_y: 0.80
+        canvas:
+            Color:
+                rgba: GUI_COLOR
+            RoundedRectangle:
+                size: self.size
+                pos: self.pos
+                radius: [dp(12),]
+        size_hint_x: 0.9
+        pos_hint: {"center_x": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(20)
-        RoundedButton:
+        Button3D:
             tag: "go_back"
             text: ARROW_LEFT
             callback_press: app.btn_goto_screen_pipeline
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             id: btn_replay
             tag: "replay"
             text: HEBREW_PE
             callback_press: app.btn_replay_press
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
-            width: dp(50)
-        Separator:
-            line_color: TRANSPARENT
-            width: dp(10)
-        RoundedButton:
+            width: dp(30)
+        Button3D:
             id: btn_play_stop
             tag: "play"
             text: TRIANGLE_RIGHT if self.tag == "play" else SQUARE
             callback_press: app.btn_play_stop_press
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "first_frame"
             text: LINE_VERTICAL + TRIANGLE_LEFT
             callback_press: app.btn_first_frame
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "backward"
             text: TRIANGLE_LEFT + TRIANGLE_LEFT
             callback_press: app.btn_backward_press
             callback_release: app.btn_backward_release
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "forward"
             text: TRIANGLE_RIGHT + TRIANGLE_RIGHT
             callback_press: app.btn_forward_press
             callback_release: app.btn_forward_release
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "last_frame"
             text: TRIANGLE_RIGHT + LINE_VERTICAL
             callback_press: app.btn_last_frame
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
-            width: dp(50)
-        RoundedButton:
+            width: dp(30)
+        Button3D:
             tag: "zoom_out"
             text: "A"
             font_size: sp(self.height * BUTTON_FONT_SMALLER)
             callback_press: app.btn_zoom_out
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(10)
-        RoundedButton:
+        Button3D:
             tag: "zoom_in"
             text: "A"
             font_size: sp(self.height * BUTTON_FONT_LARGER)
             callback_press: app.btn_zoom_in
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
         Separator:
             line_color: TRANSPARENT
             width: dp(20)
-    Separator:
-        direction: "horizontal"
-        line_color: TRANSPARENT
-        size_hint_y: 0.10
 
 
 <PeekingDuckView@BoxLayout>:
@@ -1034,7 +1103,7 @@
                 radius: [RADIUS,]
         BoxLayout:
             size_hint_y: None
-            height: dp(HEADER_HEIGHT)   # need to be updated when pkd_header.height changes
+            height: dp(HEADER_HEIGHT)   # to be updated when pkd_header.height changes
             Separator:
                 line_color: TRANSPARENT
                 width: dp(20)
@@ -1046,15 +1115,19 @@
                 width: dp(20)
         Output:
             id: pkd_output
+        Separator:  # bottom margin
+            direction: "horizontal"
+            line_color: TRANSPARENT
+            height: dp(10)
     Separator:
         direction: "horizontal"
         line_color: GUI_COLOR
         height: dp(0.01 * root.height)
     PeekingDuckControls:    # output playback buttons
         id: pkd_controls
-        height: dp(root.height * BUTTON_HEIGHT_RATIO) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT
         pos_hint: {"x": 0.01}
-        size_hint: 0.98, None
+        size_hint: 1.00, None
+        height: dp(root.height * BUTTON_HEIGHT_RATIO + 10) if root.height > MIN_HEIGHT else BUTTON_MIN_HEIGHT + dp(10)
     Separator:  # bottom margin
         direction: "horizontal"
         line_color: GUI_COLOR
