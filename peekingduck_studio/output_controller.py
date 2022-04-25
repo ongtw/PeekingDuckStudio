@@ -270,6 +270,18 @@ class OutputController:
     ####################
     # Pipeline execution
     ####################
+    def run_pipeline_done(self, *args) -> None:
+        """Called when pipeline execution is completed.
+        To perform clean-up/housekeeping tasks to ensure system consistency"""
+        for node in self.pipeline.nodes:
+            if node.name.endswith("input.visual"):
+                node.release_resources()  # clean up nodes with threads
+        self.set_play_stop_btn_to_play()
+        self._pipeline_running = False
+        self.output_layout.install_slider()
+        self.enable_slider()
+        self._pipeline_model.clear_dirty_bit()  # only if all ends well
+
     def run_pipeline_start(self, custom_nodes_parent_subdir="src") -> None:
         """Start pipeline execution by
         a) loading pipeline
@@ -320,22 +332,9 @@ class OutputController:
             msgbox = MsgBox("PeekingDuck Runtime Error", the_msg, "Ok")
             msgbox.show()
 
-    def run_pipeline_done(self, *args) -> None:
-        """Called when pipeline execution is completed.
-        To perform clean-up/housekeeping tasks to ensure system consistency"""
-        for node in self.pipeline.nodes:
-            if node.name.endswith("input.visual"):
-                node.release_resources()  # clean up nodes with threads
-        self.set_play_stop_btn_to_play()
-        self._pipeline_running = False
-        self.output_layout.install_slider()
-        self.enable_slider()
-        self._pipeline_model.clear_dirty_bit()  # only if all ends well
-
     def run_one_pipeline_iteration(self, *args) -> None:
         """Execute one iteration of the pipeline"""
-        # todo: capture runtime error msgs here
-        exec_msg: str = ""
+        exc_msg: str = ""
         _err = StringIO()
         with redirect_stderr(_err):
             try:
