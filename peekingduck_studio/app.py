@@ -624,7 +624,7 @@ A multiple-nights/weekends project using Python and Kivy"""
         if self.pipeline_model is None:
             return
         logger.debug(f"tag={btn.tag}")
-        self.output_controller.replay()
+        self.output_controller.rerun_pipeline()
 
     def btn_play_stop_press(self, btn: Button) -> None:
         if self.pipeline_model is None:
@@ -657,6 +657,9 @@ A multiple-nights/weekends project using Python and Kivy"""
 
     def btn_last_frame(self, *args) -> None:
         self.output_controller.goto_last_frame()
+
+    def btn_loop(self, *args) -> None:
+        self.output_controller.toggle_btn_loop()
 
     def btn_zoom_in(self, *args) -> None:
         self.output_controller.zoom_in()

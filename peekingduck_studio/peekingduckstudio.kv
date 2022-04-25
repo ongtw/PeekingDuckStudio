@@ -57,6 +57,7 @@
 #:set LINE_VERTICAL "\u007C"
 #:set NOTES "\u266B"
 #:set SQUARE "\u25A0"
+#:set SUN "\u263C"
 #:set TRIANGLE_DOWN "\u25BC"
 #:set TRIANGLE_LEFT "\u25C4"
 #:set TRIANGLE_RIGHT "\u25BA"
@@ -76,7 +77,8 @@
     valign: "bottom"
     padding_y:
         (self.height - self.font_size) / 2 \
-        if self.state == "normal" else (self.height - self.font_size) / 2 - 4
+        if self.state == "normal" and not self.depressed \
+        else (self.height - self.font_size) / 2 - 4
     # need to redirect callbacks (cannot change on_press at runtime)
     on_press: self.callback_press(self)
     on_release: self.callback_release(self)
@@ -93,10 +95,14 @@
             radius: [dp(12),]
         # button
         Color:
-            rgba: self.color_normal if self.state == "normal" else self.color_pressed
+            rgba:
+                self.color_depressed if self.depressed else \
+                self.color_normal if self.state == "normal" else self.color_pressed
         RoundedRectangle:
             size: self.size
-            pos: self.pos if self.state == "normal" else (self.x, self.y - 4)
+            pos:
+                self.pos if self.state == "normal" and not self.depressed \
+                else (self.x, self.y - 4)
             radius: [dp(12),]
 
 
@@ -1056,7 +1062,7 @@
         Button3D:
             id: btn_replay
             tag: "replay"
-            text: HEBREW_PE
+            text: SUN
             callback_press: app.btn_replay_press
             size_hint_y: 0.7
             pos_hint: {"center_y": 0.5}
@@ -1068,6 +1074,16 @@
             tag: "play"
             text: TRIANGLE_RIGHT if self.tag == "play" else SQUARE
             callback_press: app.btn_play_stop_press
+            size_hint_y: 0.7
+            pos_hint: {"center_y": 0.5}
+        Separator:
+            line_color: TRANSPARENT
+            width: dp(10)
+        Button3D:
+            id: btn_loop
+            tag: "loop"
+            text: HEBREW_PE
+            callback_press: app.btn_loop
             size_hint_y: 0.7
             pos_hint: {"center_y": 0.5}
         Separator:

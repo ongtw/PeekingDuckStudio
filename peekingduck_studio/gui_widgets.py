@@ -29,6 +29,7 @@ from peekingduck_studio.colors import (
     DARK_BLUE,
     DARK_SLATE_GRAY,
     DEEP_SKY_BLUE,
+    DODGER_BLUE,
     LIGHT_SKY_BLUE,
     MIDNIGHT_BLUE,
     SILVER,
@@ -294,9 +295,11 @@ class ProjectInfo(GridLayout):
 class Button3D(Button):
     # cannot assign colors in kv file, need to create properties here
     btn_height = NumericProperty(40 * Metrics.dp)
+    color_depressed = ListProperty(list(DODGER_BLUE))
     color_normal = ListProperty(list(DEEP_SKY_BLUE))
     color_pressed = ListProperty(list(DEEP_SKY_BLUE))
     color_shadow = ListProperty(list(MIDNIGHT_BLUE))
+    depressed = BooleanProperty(False)  # for on/off toggle
     has_tooltip = BooleanProperty(False)
     tooltip_text = StringProperty("")
 

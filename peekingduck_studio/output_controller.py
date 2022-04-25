@@ -32,7 +32,8 @@ logger = make_logger(__name__)
 
 
 def parse_streams(strio: StringIO) -> str:
-    """Helper method to parse I/O streams
+    """Helper method to parse I/O streams.
+    Used to capture errors/exceptions from PeekingDuck.
 
     Args:
         strio (StringIO): the I/O stream to parse
@@ -51,7 +52,8 @@ class OutputController:
         self.output_header = pkd_view.ids["pkd_header"]
         self.output_layout: Output = pkd_view.ids["pkd_output"]
         self.controls = pkd_view.ids["pkd_controls"]
-        self.play_stop_btn_parent = self.controls.ids["btn_play_stop"]
+        self.btn_play_stop = self.controls.ids["btn_play_stop"]
+        self.btn_loop = self.controls.ids["btn_loop"]
         self.output_image = self.output_layout.ids["image"]
         self.progress = None
         self.slider = self.output_layout.ids["slider"]
@@ -60,7 +62,7 @@ class OutputController:
         self.zoom_idx = 2  # default 100% zoom
         # make output display black (else it will be white by default)
         self._black_frame = np.empty((768, 1024, 3))
-        self.blitz_texture(self._black_frame)
+        self._blitz_texture(self._black_frame)
         # pipeline control vars
         self.frames: List = None
         self._pipeline_model: ModelPipeline = None
@@ -75,13 +77,13 @@ class OutputController:
     @node_height.setter
     def node_height(self, height: int) -> None:
         self._node_height = max(80, height)
-        self.update_nodes()
+        self._update_nodes()
 
     @property
     def pipeline_running(self) -> bool:
         return self._pipeline_running
 
-    def set_output_header(self, text: str, color: Tuple = None) -> None:
+    def _set_output_header(self, text: str, color: Tuple = None) -> None:
         """Set Output header text and optional color
 
         Args:
@@ -93,6 +95,9 @@ class OutputController:
         if color:
             self.output_header.font_color = color
 
+    #####################
+    # External interfaces: called from outside of OutputController
+    #####################
     def set_pipeline_model(self, pipeline_model: ModelPipeline) -> None:
         """Set internal pipeline model based on current pipeline
 
@@ -101,78 +106,11 @@ class OutputController:
         """
         self._pipeline_model = pipeline_model
 
-    #####################
-    # Output playback
-    #####################
-    def replay(self) -> None:
-        """Cause PeekingDuck to rerun entire pipeline by setting its dirty bit"""
-        self._pipeline_model.set_dirty_bit()
-        self.play_stop()
-
-    def play_stop(self) -> None:
-        """Toggle play/stop button and play/stop output playback accordingly"""
-        tag = self.play_stop_btn_parent.tag
-        logger.debug(f"tag={tag}")
-        if tag == "play":
-            self.set_play_stop_btn_to_stop()
-            if self._pipeline_model.dirty:
-                self.set_output_header(
-                    f"Running {self._pipeline_model.filename}", color=RED
-                )
-                self.run_pipeline_start()  # play modified pipeline
-            else:
-                self.set_output_header(
-                    f"Replaying {self._pipeline_model.filename}", color=GREEN
-                )
-                self.do_playback()  # play last unmodified pipeline
-        else:
-            self.set_play_stop_btn_to_play()
-            if self._pipeline_running:
-                self.stop_running_pipeline()
-            elif self._output_playback:
-                self.stop_playback()
-
-    def do_playback(self, *args) -> None:
-        """Playback the output, called repeatedly by clock scheduler until stop"""
-        self._output_playback = True
-        if self._forward_one_frame():
-            self.forward_one_frame_held = Clock.schedule_once(
-                self.do_playback, PLAYBACK_INTERVAL
-            )
-        else:
-            self.stop_playback()
-
-    def _forward_one_frame(self) -> bool:
-        """Internal method to move forward one frame, can be called repeatedly"""
-        if self.frame_idx + 1 < len(self.frames):
-            self.frame_idx += 1
-            self.show_frame()
-            return True
-        return False
-
-    def _backward_one_frame(self) -> bool:
-        """Internal method to move back one frame, can be called repeatedly"""
-        if self.frame_idx > 0:
-            self.frame_idx -= 1
-            self.show_frame()
-            return True
-        return False
-
-    def stop_playback(self) -> None:
-        """Stop output playback"""
-        if hasattr(self, "forward_one_frame_held"):
-            self.forward_one_frame_held.cancel()
-        self._output_playback = False
-        self.set_play_stop_btn_to_play()
-
-    def set_play_stop_btn_to_play(self) -> None:
-        """Housekeeping task when setting play/stop button to play"""
-        self.play_stop_btn_parent.tag = "play"
-        self.set_output_header(self._pipeline_model.filename, color=WHITE)
-
-    def set_play_stop_btn_to_stop(self) -> None:
-        """Housekeeping task when setting play/stop button to stop"""
-        self.play_stop_btn_parent.tag = "stop"
+    def backward_one_frame(self) -> bool:
+        """Move back one frame"""
+        if self._pipeline_running or self._output_playback or self.frames is None:
+            return False
+        return self._backward_one_frame()
 
     def forward_one_frame(self) -> bool:
         """Move forward one frame"""
@@ -180,43 +118,120 @@ class OutputController:
             return False
         return self._forward_one_frame()
 
-    def backward_one_frame(self) -> bool:
-        """Move back one frame"""
-        if self._pipeline_running or self._output_playback or self.frames is None:
-            return False
-        return self._backward_one_frame()
-
     def goto_first_frame(self) -> None:
         """Goto first frame of playback"""
         if self._pipeline_running or self._output_playback or self.frames is None:
             return
         self.frame_idx = 0
-        self.show_frame()
+        self._show_frame()
 
     def goto_last_frame(self) -> None:
         """Goto last frame of playback"""
         if self._pipeline_running or self._output_playback or self.frames is None:
             return
         self.frame_idx = len(self.frames) - 1
-        self.show_frame()
+        self._show_frame()
+
+    def play_stop(self) -> None:
+        """Toggle play/stop button and play/stop output playback accordingly"""
+        tag = self.btn_play_stop.tag
+        logger.debug(f"current tag={tag}")
+        if tag == "play":
+            self._toggle_btn_play_stop(state="stop")
+            if self._pipeline_model.dirty:
+                self._set_output_header(
+                    f"Running {self._pipeline_model.filename}", color=RED
+                )
+                self._run_pipeline_start()  # play modified pipeline
+            else:
+                self._set_output_header(
+                    f"Replaying {self._pipeline_model.filename}", color=GREEN
+                )
+                self._do_playback()  # play last unmodified pipeline
+        else:
+            if self._pipeline_running:
+                self._stop_running_pipeline()
+            elif self._output_playback:
+                self._stop_playback()
+
+    def rerun_pipeline(self) -> None:
+        """Cause PeekingDuck to rerun entire pipeline by setting its dirty bit"""
+        self._pipeline_model.set_dirty_bit()
+        self.play_stop()
+
+    def toggle_btn_loop(self) -> None:
+        self.btn_loop.depressed = not self.btn_loop.depressed
 
     def zoom_in(self) -> None:
         """Zoom in: make image larger"""
         if self.zoom_idx + 1 < len(ZOOMS):
             self.zoom_idx += 1
-            self.update_zoom_text()
+            self._update_zoom_text()
 
     def zoom_out(self) -> None:
         """Zoom out: make image smaller"""
         if self.zoom_idx > 0:
             self.zoom_idx -= 1
-            self.update_zoom_text()
+            self._update_zoom_text()
 
-    def update_zoom_text(self) -> None:
+    ################
+    # Internal methods: used within OutputController
+    ################
+    def _backward_one_frame(self) -> bool:
+        """Internal method to move back one frame, can be called repeatedly"""
+        if self.frame_idx > 0:
+            self.frame_idx -= 1
+            self._show_frame()
+            return True
+        return False
+
+    def _forward_one_frame(self) -> bool:
+        """Internal method to move forward one frame, can be called repeatedly"""
+        if self.frame_idx + 1 < len(self.frames):
+            self.frame_idx += 1
+            self._show_frame()
+            return True
+        return False
+
+    def _do_playback(self, *args) -> None:
+        """Playback the output, called repeatedly by clock scheduler until stop"""
+        self._output_playback = True
+        if self._forward_one_frame():
+            self.forward_one_frame_held = Clock.schedule_once(
+                self._do_playback, PLAYBACK_INTERVAL
+            )
+        else:
+            self._stop_playback()
+            # print(f"btn_loop.depressed={self.btn_loop.depressed}")
+            if self.btn_loop.depressed:  # auto loop video
+                self.goto_first_frame()
+                self.play_stop()
+
+    def _stop_playback(self) -> None:
+        """Stop output playback"""
+        if hasattr(self, "forward_one_frame_held"):
+            self.forward_one_frame_held.cancel()
+        self._output_playback = False
+        self._toggle_btn_play_stop(state="play")
+
+    def _toggle_btn_play_stop(self, state: str) -> None:
+        """Set Play/Stop button state to given state and perform any necessary
+        housekeeping tasks.
+
+        Args:
+            state (str): either "play" / "stop"
+        """
+        assert state in ["play", "stop"]
+        self.btn_play_stop.tag = state
+        logger.debug(f"new state={self.btn_play_stop.tag}")
+        if state == "play":
+            self._set_output_header(self._pipeline_model.filename, color=WHITE)
+
+    def _update_zoom_text(self) -> None:
         """Databinding for zoom -> image"""
         glyph = ZOOM_TEXT[self.zoom_idx]
         self.zoom.text = f"Zoom: {glyph}"
-        self.show_frame()
+        self._show_frame()
 
     ####################
     # Output display widget management: hide/show progress/slider/zoom
@@ -224,7 +239,7 @@ class OutputController:
     # def disable_progress(self) -> None:
     #     pass  # not used
 
-    def enable_progress(self) -> None:
+    def _enable_progress(self) -> None:
         """Make progress bar visible and reset its properties for playback"""
         self.progress = self.output_layout.ids["progress"]
         self.progress.max = self.num_frames
@@ -232,11 +247,11 @@ class OutputController:
         logger.debug(f"max={self.progress.max}")
         self.frame_counter.opacity = 1.0
 
-    def disable_slider(self) -> None:
+    def _disable_slider(self) -> None:
         """Make slider invisible"""
         self.slider.opacity = 0.0
 
-    def enable_slider(self) -> None:
+    def _enable_slider(self) -> None:
         """Make slider visible and reset its properties for playback"""
         self.slider = self.output_layout.ids["slider"]
         self.slider.opacity = 1.0
@@ -245,10 +260,10 @@ class OutputController:
         self.slider.step = 1
         self.slider.value = self.frame_idx
         self.slider.value_track = True
-        self.slider.bind(value=self.slider_value_changed)
+        self.slider.bind(value=self._slider_value_changed)
         self.frame_counter.opacity = 1.0
 
-    def slider_value_changed(self, instance, value: int) -> None:
+    def _slider_value_changed(self, instance, value: int) -> None:
         """Databinding for slider -> image
 
         Args:
@@ -257,32 +272,32 @@ class OutputController:
         """
         # logger.debug(f"value={value}")
         self.frame_idx = value - 1
-        self.show_frame()
+        self._show_frame()
 
-    def disable_zoom(self) -> None:
+    def _disable_zoom(self) -> None:
         """Make zoom widget invisible"""
         self.zoom.opacity = 0.0
 
-    def enable_zoom(self) -> None:
+    def _enable_zoom(self) -> None:
         """Make zoom widget visible"""
         self.zoom.opacity = 1.0
 
     ####################
     # Pipeline execution
     ####################
-    def run_pipeline_done(self, *args) -> None:
+    def _run_pipeline_done(self, *args) -> None:
         """Called when pipeline execution is completed.
         To perform clean-up/housekeeping tasks to ensure system consistency"""
         for node in self.pipeline.nodes:
             if node.name.endswith("input.visual"):
                 node.release_resources()  # clean up nodes with threads
-        self.set_play_stop_btn_to_play()
+        self._toggle_btn_play_stop(state="play")
         self._pipeline_running = False
         self.output_layout.install_slider()
-        self.enable_slider()
+        self._enable_slider()
         self._pipeline_model.clear_dirty_bit()  # only if all ends well
 
-    def run_pipeline_start(self, custom_nodes_parent_subdir="src") -> None:
+    def _run_pipeline_start(self, custom_nodes_parent_subdir="src") -> None:
         """Start pipeline execution by
         a) loading pipeline
         b) preparing Output widgets for playback
@@ -301,17 +316,17 @@ class OutputController:
             try:
                 pipeline_str = self._pipeline_model.get_string_representation()
                 working_dir = self._pipeline_model.fileparent
-                self.load_pipeline(
+                self._load_pipeline(
                     pipeline_str, working_dir, custom_nodes_parent_subdir
                 )
                 self.frames = []
                 self.frame_idx = -1
-                self.disable_slider()
+                self._disable_slider()
                 self.output_layout.install_progress_bar()
-                self.enable_zoom()
-                Clock.schedule_once(self.run_one_pipeline_iteration, PLAYBACK_INTERVAL)
+                self._enable_zoom()
+                Clock.schedule_once(self._run_one_pipeline_iteration, PLAYBACK_INTERVAL)
             except BaseException as e:
-                self.set_play_stop_btn_to_play()
+                self._toggle_btn_play_stop(state="play")
                 logger.exception("PeekingDuck Error!")
                 # exc_msg = str(e)
                 exc_msg = traceback.format_exc()
@@ -332,7 +347,7 @@ class OutputController:
             msgbox = MsgBox("PeekingDuck Runtime Error", the_msg, "Ok")
             msgbox.show()
 
-    def run_one_pipeline_iteration(self, *args) -> None:
+    def _run_one_pipeline_iteration(self, *args) -> None:
         """Execute one iteration of the pipeline"""
         exc_msg: str = ""
         _err = StringIO()
@@ -365,7 +380,7 @@ class OutputController:
                         frame = cv2.flip(img, 0)  # flip around x-axis
                         self.frames.append(frame)  # save frame for playback
                         self.frame_idx += 1
-                        self.show_frame()
+                        self._show_frame()
                     else:
                         outputs = node.run(inputs)
                         self.pipeline.data.update(outputs)
@@ -374,7 +389,7 @@ class OutputController:
                         num_frames = node.total_frame_count
                         if num_frames > 0:
                             self.num_frames = num_frames
-                            self.enable_progress()
+                            self._enable_progress()
                         else:
                             self.num_frames = 0
                             self.progress = None
@@ -384,16 +399,16 @@ class OutputController:
 
                 if not self.pipeline.terminate:
                     Clock.schedule_once(
-                        self.run_one_pipeline_iteration, PLAYBACK_INTERVAL
+                        self._run_one_pipeline_iteration, PLAYBACK_INTERVAL
                     )
                 else:
-                    Clock.schedule_once(self.run_pipeline_done, PLAYBACK_INTERVAL)
+                    Clock.schedule_once(self._run_pipeline_done, PLAYBACK_INTERVAL)
             except BaseException as e:
                 logger.exception("PeekingDuck Error!")
                 # exc_msg = str(e)
                 exc_msg = traceback.format_exc()
-                self.run_pipeline_done()
-                self.disable_slider()
+                self._run_pipeline_done()
+                self._disable_slider()
                 self._pipeline_model.set_dirty_bit()  # but all is not well
 
         err_msg = parse_streams(_err)
@@ -407,23 +422,23 @@ class OutputController:
             msgbox = MsgBox("PeekingDuck Runtime Error", the_msg, "Ok")
             msgbox.show()
 
-    def stop_running_pipeline(self) -> None:
+    def _stop_running_pipeline(self) -> None:
         """Signals pipeline execution to be stopped"""
         self.pipeline.terminate = True
 
-    def show_frame(self) -> None:
+    def _show_frame(self) -> None:
         """Renders image frame pointed to by the index self.frame_idx"""
         if self.frames:
             frame = self.frames[self.frame_idx]
-            frame = self.apply_zoom(frame)  # note: can speed up zoom?
-            self.blitz_texture(frame)
+            frame = self._apply_zoom(frame)  # note: can speed up zoom?
+            self._blitz_texture(frame)
             # mimic an observer pattern-like behavior...
             # not as cool as binding slider.value directly to self.frame_idx :(
             frame_count = self.frame_idx + 1
             self.slider.value = frame_count
             self.frame_counter.text = str(frame_count)
 
-    def apply_zoom(self, frame: np.ndarray) -> np.ndarray:
+    def _apply_zoom(self, frame: np.ndarray) -> np.ndarray:
         """Zoom output image in real-time
 
         Args:
@@ -447,7 +462,7 @@ class OutputController:
             frame = cv2.resize(frame, (new_size[1], new_size[0]))
         return frame
 
-    def blitz_texture(self, frame: np.ndarray) -> None:
+    def _blitz_texture(self, frame: np.ndarray) -> None:
         """The good ol' graphics framebuffer bit blitz
 
         Args:
@@ -472,7 +487,7 @@ class OutputController:
         # self.output_image.size = image_size
         # # logger.debug(f"image size: {self.output_image.size} in {type(parent)} {parent_size}")
 
-    def load_pipeline(
+    def _load_pipeline(
         self, pipeline_str: str, working_dir: str, custom_nodes_parent_subdir: str
     ) -> None:
         """Convert YAML pipeline into internal Pipeline object by saving it into a temp
@@ -515,7 +530,7 @@ class OutputController:
             self.pipeline: Pipeline = self.node_loader.get_pipeline()
             logger.debug(f"self.pipeline: {self.pipeline}")
 
-    def update_nodes(self) -> None:
+    def _update_nodes(self) -> None:
         """Update UI properties of playback screen"""
         self.output_header.height = self.node_height // 2
         self.output_header.parent.height = self.output_header.height
