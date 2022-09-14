@@ -18,6 +18,7 @@
 # Quirk list:
 # - resize window: long text exceeding button width
 # - resize window: filechooser not scaling up
+# - UI: no feedback when downloading model weights, user may think PKDS has hung
 #
 # Todo list:
 # - allow user to change current pipeline working directory

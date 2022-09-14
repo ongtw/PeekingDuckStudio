@@ -4,6 +4,7 @@
 
 from typing import List, Tuple
 from contextlib import redirect_stderr
+from datetime import datetime
 from pathlib import Path
 import copy
 import cv2
@@ -491,7 +492,7 @@ class OutputController:
         self, pipeline_str: str, working_dir: str, custom_nodes_parent_subdir: str
     ) -> None:
         """Convert YAML pipeline into internal Pipeline object by saving it into a temp
-        'pipeline.yml' file and loading that using PeekingDuck's DeclarativeLoader class.
+        working pipeline file and loading that using PeekingDuck's DeclarativeLoader class.
 
         Args:
             pipeline_str (str): YAML representation of pipeline
@@ -502,33 +503,36 @@ class OutputController:
             os.chdir(working_dir)
         else:
             working_dir = str(Path.home())
-        # logger.debug(f"pipeline={pipeline_str}")
-        # logger.debug(f"working_dir={working_dir}, cwd={os.getcwd()}")
 
-        with TemporaryDirectory(dir=working_dir) as tempdir:
-            logger.debug(f"tempdir={tempdir}")
-            pipeline_path = os.path.join(tempdir, "pipeline.yml")
-            with open(pipeline_path, "w") as tempfile:
-                tempfile.writelines(pipeline_str)
-            # # debug tempfile contents
-            # logger.debug("tempfile:")
-            # with open(pipeline_path, "r") as tempfile:
-            #     logger.debug(tempfile.readline())
-            # logger.debug("----------")
-            # yaml safe load
-            logger.debug("yaml")
-            with open(pipeline_path, "r") as tempfile:
-                the_yaml = yaml.safe_load(tempfile)
-            logger.debug(the_yaml)
-            logger.debug("-----")
-            ss = yaml.dump(the_yaml, default_flow_style=None)
-            logger.debug(ss)
-            logger.debug("-----")
-            self.node_loader = DeclarativeLoader(
-                pipeline_path, "None", custom_nodes_parent_subdir
-            )
-            self.pipeline: Pipeline = self.node_loader.get_pipeline()
-            logger.debug(f"self.pipeline: {self.pipeline}")
+        logger.debug(f"pipeline_data={pipeline_str}")
+        logger.debug(f"working_dir={working_dir}, cwd={os.getcwd()}")
+
+        # create temp working file
+        now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        tmp_filename = f"pkds_pipeline_{now_str}.yml"
+        pipeline_path = os.path.join(working_dir, tmp_filename)
+        logger.debug(f"pipeline_path={pipeline_path}")
+        with open(pipeline_path, "w") as tempfile:
+            tempfile.writelines(pipeline_str)
+        # read yaml and show debug info
+        logger.debug("yaml")
+        with open(pipeline_path, "r") as tempfile:
+            the_yaml = yaml.safe_load(tempfile)
+        logger.debug(the_yaml)
+        logger.debug("-----")
+        ss = yaml.dump(the_yaml, default_flow_style=None)
+        logger.debug(ss)
+        logger.debug("-----")
+        # load temp working file into pipeline object
+        self.node_loader = DeclarativeLoader(
+            Path(pipeline_path), "None", custom_nodes_parent_subdir
+        )
+        self.pipeline: Pipeline = self.node_loader.get_pipeline()
+        logger.debug(f"self.pipeline: {self.pipeline}")
+        # clean up by removing temp file
+        if os.path.isfile(pipeline_path):
+            logger.debug(f"delete {pipeline_path}")
+            os.remove(pipeline_path)
 
     def _update_nodes(self) -> None:
         """Update UI properties of playback screen"""
