@@ -54,7 +54,7 @@ from datetime import datetime
 
 print(
     f"Start: {datetime.now().strftime('%H:%M:%S')}"
-)  # temp to debug pyinstaller launch times
+)  # temp printf to debug pyinstaller launch times
 from kivy.config import Config
 from kivy.metrics import Metrics
 
@@ -115,8 +115,6 @@ print(f"PeekingDuck import end: {datetime.now().strftime('%H:%M:%S')}")
 # Globals
 ##########
 ROOT_PATH = "/"
-# temp: for convenience
-# CURR_PATH = "/Users/dotw/src/pkd"
 CURR_PATH = str(Path.home())
 DIR_FILTERS = [""]
 FILE_FILTERS = ["*yml"]

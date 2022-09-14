@@ -15,7 +15,6 @@ import traceback
 import yaml
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
-from tempfile import TemporaryDirectory
 from peekingduck.declarative_loader import DeclarativeLoader
 from peekingduck.pipeline.pipeline import Pipeline
 from peekingduck_studio.colors import RED, GREEN, WHITE
